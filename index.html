@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>経穴学習アプリ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>経穴学習アプリ</h1>
+    </header>
+
+    <main>
+        <!-- =================================== -->
+        <!-- 1. メイン画面                      -->
+        <!-- =================================== -->
+        <section id="main-screen">
+            <div class="search-container">
+                <h2>経穴名で検索</h2>
+                <p>経穴名を入力してください（ひらがな可）</p>
+                <input type="text" id="acupoint-search-input" placeholder="例: ごうこく">
+                <button id="search-btn">検索</button>
+            </div>
+
+            <div class="selection-container">
+                <h2>症状・病床から選択</h2>
+                <p>症状や病床を選択してください</p>
+                <select id="symptom-select">
+                    <option value="">-- 選択してください --</option>
+                    <option value="symptom1">サンプル症状1: 頭痛・発熱</option>
+                    <option value="symptom2">サンプル症状2: 胃腸の不調</option>
+                    <option value="symptom3">サンプル症状3: 肩こり・首の痛み</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- =================================== -->
+        <!-- 2. 経穴詳細画面 (経穴名検索の結果)  -->
+        <!-- =================================== -->
+        <section id="acupoint-result-screen" class="hidden">
+            <button class="back-to-main-btn">← メイン画面に戻る</button>
+            <div class="result-layout">
+                <!-- 左側: 3Dモデル表示エリア -->
+                <div class="model-container">
+                    <div class="placeholder"><p>ここに体の3Dモデルが表示されます<br>（単一の経穴）</p></div>
+                </div>
+
+                <!-- 右側: 情報表示エリア -->
+                <div class="info-container">
+                    <h2 id="result-name">合谷 (ごうこく)</h2>
+                    
+                    <h3>位置</h3>
+                    <p id="result-location">（サンプル）手の甲で、第1中手骨と第2中手骨の間、第2中手骨の中点の橈側。</p>
+
+                    <h3>効果 (Webより)</h3>
+                    <ul id="result-effects">
+                        <li>（サンプル）頭痛、歯痛の緩和</li>
+                        <li>（サンプル）鼻づまり、鼻炎の改善</li>
+                        <li>（サンプル）下痢、便秘の調整</li>
+                    </ul>
+
+                    <h3>メモ (OneNote連携)</h3>
+                    <textarea id="memo-area" placeholder="ここにメモを入力..."></textarea>
+                    <button id="save-memo-btn">メモを保存</button>
+
+                    <h3>関連する症状・病床</h3>
+                    <ul id="related-symptoms">
+                        <li><a href="#">サンプル症状1: 頭痛・発熱</a></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- 3. 症状別経穴一覧画面 (症状・病床選択の結果) -->
+        <!-- ========================================== -->
+        <section id="symptom-result-screen" class="hidden">
+            <button class="back-to-main-btn">← メイン画面に戻る</button>
+            <h2 id="symptom-result-title">サンプル症状1: 頭痛・発熱</h2>
+            <div class="result-layout">
+                <!-- 左側: 3Dモデル表示エリア -->
+                <div class="model-container">
+                    <div class="placeholder"><p>ここに体の3Dモデルが表示されます<br>（関連する全ての経穴）</p></div>
+                </div>
+
+                <!-- 右側: 経穴リストエリア -->
+                <div class="info-container">
+                    <h3>関連する経穴一覧</h3>
+                    <ul id="symptom-acupoints-list">
+                        <li><a href="#" class="acupoint-link" data-acupoint-id="goukoku">合谷 (ごうこく)</a></li>
+                        <li><a href="#" class="acupoint-link" data-acupoint-id="fuuchi">風池 (ふうち)</a></li>
+                        <li><a href="#" class="acupoint-link" data-acupoint-id="kyokuchi">曲池 (きょくち)</a></li>
+                    </ul>
+                    <p>※リストの経穴名をクリックすると、その経穴の詳細画面に移動します。</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
