@@ -1,7 +1,6 @@
-/* 基本レイアウト（元の構造を維持） */
 body {
   margin:0;
-  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif;
   background:#f5f7fa;
   color:#222;
   line-height:1.6;
@@ -26,13 +25,11 @@ section { margin-bottom:40px; }
   margin-bottom:26px;
   box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
 }
-
 .search-container h2, .selection-container h2 {
   margin:0 0 8px;
   font-size:1.15rem;
   letter-spacing:.05em;
 }
-
 .search-container input {
   width:100%;
   font-size:1rem;
@@ -62,9 +59,7 @@ section { margin-bottom:40px; }
 #search-btn:hover { background:#0b5ed7; }
 #search-btn:active { background:#094fad; }
 
-.suggestion-wrapper {
-  position:relative;
-}
+.suggestion-wrapper { position:relative; }
 #acupoint-suggestion-list {
   list-style:none;
   margin:4px 0 0;
@@ -76,9 +71,7 @@ section { margin-bottom:40px; }
   border-radius:10px;
   box-shadow:0 10px 22px -10px rgba(0,0,0,.25);
 }
-#acupoint-suggestion-list.hidden {
-  display:none;
-}
+#acupoint-suggestion-list.hidden { display:none; }
 #acupoint-suggestion-list li {
   display:flex;
   justify-content:space-between;
@@ -88,9 +81,7 @@ section { margin-bottom:40px; }
   font-size:.92rem;
   line-height:1.3;
 }
-#acupoint-suggestion-list li:nth-child(odd){
-  background:#fbfcfd;
-}
+#acupoint-suggestion-list li:nth-child(odd){ background:#fbfcfd; }
 #acupoint-suggestion-list li:hover,
 #acupoint-suggestion-list li.active {
   background:#0d6efd;
@@ -113,17 +104,10 @@ section { margin-bottom:40px; }
   border-radius:18px;
   box-shadow:0 6px 20px -8px rgba(0,0,0,.18);
 }
-.model-container {
-  flex:1 1 260px;
-  min-width:240px;
-}
-.info-container {
-  flex:2 1 420px;
-  min-width:320px;
-}
+.model-container { flex:1 1 260px; min-width:240px; }
+.info-container { flex:2 1 420px; min-width:320px; }
 .placeholder {
-  background:repeating-linear-gradient(
-      45deg,#f1f4f8,#f1f4f8 10px,#e4e9ef 10px,#e4e9ef 20px);
+  background:repeating-linear-gradient(45deg,#f1f4f8,#f1f4f8 10px,#e4e9ef 10px,#e4e9ef 20px);
   border:1px solid #cfd6dd;
   height:220px;
   border-radius:12px;
@@ -143,7 +127,6 @@ section { margin-bottom:40px; }
   color:#0d47a1;
   font-weight:600;
 }
-
 .info-container h3 {
   margin:22px 0 5px;
   font-size:.9rem;
