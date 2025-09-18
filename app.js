@@ -1,8 +1,8 @@
 /******************************************************
  * 経穴データ
- * - meridian: 経絡
- * - region: 部位（簡易説明）
- * - important: 要穴分類など
+ *  - meridian: 経絡
+ *  - region: 部位
+ *  - important: 要穴分類など
  ******************************************************/
 const ACUPOINTS = [
   { id: 'chokyo',   kanji: '長強',   kana: 'ちょうきょう', meridian: '督脈', region: '尾骨端付近',          important: '（要穴未設定）' },
@@ -35,7 +35,7 @@ const ACUPOINTS = [
   { id: 'ginko',    kanji: '齦交',   kana: 'ぎんこう',     meridian: '督脈', region: '上歯齦裏正中',        important: '（要穴未設定）' }
 ].map(p => ({
   ...p,
-  searchable: (p.kanji + p.kana + (p.meridian || '') + (p.region || '')).replace(/\s+/g, '')
+  searchable: (p.kanji + p.kana + (p.meridian || '') + (p.region || '')).replace(/\s+/g, '').toLowerCase()
 }));
 
 /******************************************************
@@ -47,7 +47,7 @@ const SYMPTOMS = {
 };
 
 /******************************************************
- * DOM
+ * DOM 取得
  ******************************************************/
 const inputEl = document.getElementById('acupoint-search-input');
 const suggestionListEl = document.getElementById('acupoint-suggestion-list');
@@ -85,10 +85,9 @@ function normalizeInput(str) {
 }
 
 function filterAcupoints(query) {
-  if (!query) return [];
   const q = normalizeInput(query);
   if (q.length < 2) return [];
-  return ACUPOINTS.filter(p => p.searchable.toLowerCase().includes(q));
+  return ACUPOINTS.filter(p => p.searchable.includes(q));
 }
 
 /******************************************************
@@ -101,7 +100,7 @@ function clearSuggestions() {
 
 function renderSuggestions(list) {
   suggestionListEl.innerHTML = '';
-  if (list.length === 0) {
+  if (!list.length) {
     const li = document.createElement('li');
     li.textContent = '該当なし';
     li.style.color = '#888';
@@ -162,12 +161,12 @@ function selectAcupoint(point) {
 }
 
 function showAcupointDetail(point) {
-  resultNameEl.textContent = `${point.kanji} (${point.kana})`;
+  resultNameEl.textContent      = `${point.kanji} (${point.kana})`;
   resultMeridianEl.textContent  = point.meridian  || '（経絡未登録）';
-  resultPointEl.textContent     = point.kanji || '（経穴未登録）';
+  resultPointEl.textContent     = point.kanji     || '（経穴未登録）';
   resultRegionEl.textContent    = point.region    || '（部位未登録）';
   resultImportantEl.textContent = point.important || '（要穴未登録）';
-  relatedSymptomsEl.innerHTML = '<li>（関連症状未登録）</li>';
+  relatedSymptomsEl.innerHTML   = '<li>（関連症状未登録）</li>';
   showScreen(acupointResultScreen);
 }
 
@@ -175,9 +174,8 @@ function showAcupointDetail(point) {
  * 症状（デモ）
  ******************************************************/
 symptomSelect.addEventListener('change', () => {
-  const v = symptomSelect.value;
-  if (!v) return;
-  renderSymptom(v);
+  if (!symptomSelect.value) return;
+  renderSymptom(symptomSelect.value);
 });
 
 function renderSymptom(id) {
@@ -220,8 +218,7 @@ inputEl.addEventListener('keyup', e => {
     clearSuggestions();
     return;
   }
-  const list = filterAcupoints(val);
-  renderSuggestions(list);
+  renderSuggestions(filterAcupoints(val));
 });
 
 inputEl.addEventListener('keydown', e => {
@@ -244,7 +241,8 @@ searchBtn.addEventListener('click', () => {
  * クリック外でサジェスト閉じる
  ******************************************************/
 document.addEventListener('click', e => {
-  if (!e.target.closest('.suggestion-wrapper')) {
+  if (!e.target.closest('.suggestion-wrapper') &&
+      !e.target.closest('#acupoint-search-input')) {
     clearSuggestions();
   }
 });
