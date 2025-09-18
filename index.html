@@ -13,15 +13,14 @@
 </header>
 
 <main>
-  <!-- メイン画面 -->
   <section id="main-screen">
     <div class="search-container">
       <h2>経穴検索</h2>
-      <p>経穴名（漢字 または ひらがな）を入力してください（1文字以上で候補表示）</p>
+      <p>経穴名（漢字 / ひらがな）または筋肉名（漢字）を入力してください（1文字以上で候補表示）</p>
       <input
         type="text"
         id="acupoint-search-input"
-        placeholder="例: 百会 / ひゃくえ / 合谷 / あしさんり"
+        placeholder="例: 百会 / ひゃくえ / 合谷 / 僧帽筋 / 大胸筋 / あしさんり"
         autocomplete="off"
         aria-autocomplete="list"
         aria-haspopup="listbox"
@@ -33,26 +32,23 @@
       </div>
       <button id="search-btn" type="button">検索</button>
       <p class="note-small">
-        ※内部で経穴名の全ての空白を正規化。ひらがな=前方一致→0件時に部分一致 / 漢字=部分一致。
+        ひらがな=読み検索（前方一致→部分） / それ以外=経穴名 + 筋肉フィールド部分一致（筋肉ヒットは M バッジ）
       </p>
       <p id="data-load-status" class="note-status">CSV 読み込み中...</p>
     </div>
 
     <div class="selection-container">
       <h2>症状・病床から選択（デモ）</h2>
-      <p>選択すると関連経穴を表示します。</p>
+      <p>選択すると関連経穴が下部に表示されます。</p>
       <select id="symptom-select">
         <option value="">-- 選択してください --</option>
         <option value="symptom_demo1">デモ症状: 頭痛</option>
         <option value="symptom_demo2">デモ症状: 首肩こり</option>
       </select>
     </div>
-  </section>
 
-  <!-- 経穴詳細画面 -->
-  <section id="acupoint-result-screen" class="hidden">
-    <button class="back-to-main-btn" type="button">← メイン画面に戻る</button>
-    <div class="result-layout">
+    <!-- 経穴詳細（インライン） -->
+    <div id="inline-acupoint-result" class="result-layout hidden" aria-live="polite">
       <div class="model-container">
         <div class="placeholder">
           <p>ここに3Dモデル（単一経穴）</p>
@@ -79,26 +75,24 @@
         </ul>
       </div>
     </div>
-  </section>
 
-  <!-- 症状別経穴一覧画面 -->
-  <section id="symptom-result-screen" class="hidden">
-    <button class="back-to-main-btn" type="button">← メイン画面に戻る</button>
-    <h2 id="symptom-result-title">デモ症状: 頭痛</h2>
-    <div class="result-layout">
+    <!-- 症状→関連経穴一覧（インライン） -->
+    <div id="inline-symptom-result" class="result-layout hidden" aria-live="polite">
       <div class="model-container">
         <div class="placeholder">
           <p>ここに3Dモデル（複数経穴）</p>
         </div>
       </div>
       <div class="info-container">
+        <h2 id="symptom-result-title">（症状名）</h2>
         <h3>関連する経穴一覧</h3>
         <ul id="symptom-acupoints-list">
           <li>（関連経穴なし）</li>
         </ul>
-        <p class="note-small">※クリックで詳細へ遷移</p>
+        <p class="note-small">※クリックで上の「経穴詳細」パネルを更新</p>
       </div>
     </div>
+
   </section>
 </main>
 
