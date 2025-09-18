@@ -1,129 +1,88 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>経穴学習アプリ</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        .suggestion-wrapper {
-            position: relative;
-            max-width: 420px;
-        }
-        #acupoint-suggestion-list {
-            position: absolute;
-            top: 100%;
-            left: 0; right: 0;
-            background: #fff;
-            border: 1px solid #ccc;
-            z-index: 30;
-            list-style: none;
-            margin: 4px 0 0;
-            padding: 0;
-            max-height: 260px;
-            overflow-y: auto;
-            font-size: 0.95rem;
-        }
-        #acupoint-suggestion-list.hidden { display: none; }
-        #acupoint-suggestion-list li {
-            padding: 6px 10px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            gap: 8px;
-            line-height: 1.2;
-        }
-        #acupoint-suggestion-list li:hover,
-        #acupoint-suggestion-list li.active {
-            background: #f0f7ff;
-        }
-        #acupoint-suggestion-list .kana {
-            color: #666;
-            font-size: 0.75rem;
-            white-space: nowrap;
-        }
-        .hidden { display: none; }
-    </style>
+  <meta charset="UTF-8">
+  <title>経穴検索デモ</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-    <h1>経穴学習アプリ</h1>
+  <h1>経穴検索デモ</h1>
 </header>
 
 <main>
-    <!-- 1. メイン画面 -->
-    <section id="main-screen">
-        <div class="search-container">
-            <h2>経穴名で検索</h2>
-            <p>経穴名（漢字 / ひらがな）を入力してください。例: ちょうきょう / 長強</p>
-            <div class="suggestion-wrapper">
-                <input type="text" id="acupoint-search-input" placeholder="例: ちょうきょう / 長強" autocomplete="off">
-                <ul id="acupoint-suggestion-list" class="hidden"></ul>
-            </div>
-            <button id="search-btn">検索</button>
-            <p style="font-size:0.75rem;color:#666;margin-top:4px;">
-                ※2文字以上で候補表示。スペースは自動で無視します。
-            </p>
-        </div>
-
-        <div class="selection-container">
-            <h2>症状・病床から選択</h2>
-            <p>症状や病床を選択してください（デモ）</p>
-            <select id="symptom-select">
-                <option value="">-- 選択してください --</option>
-                <option value="symptom_demo1">デモ症状: 頭痛</option>
-                <option value="symptom_demo2">デモ症状: 首肩こり</option>
-            </select>
-        </div>
-    </section>
-
-<!-- 2. 経穴詳細画面 -->
-<section id="acupoint-result-screen" class="hidden">
-  <button class="back-to-main-btn">← メイン画面に戻る</button>
-  <div class="result-layout">
-    <div class="model-container">
-      <div class="placeholder"><p>ここに3Dモデル（単一経穴）</p></div>
+  <!-- 1. メイン画面 -->
+  <section id="main-screen">
+    <div class="search-container">
+      <h2>経穴検索</h2>
+      <p>経穴名を入力してください（2文字以上で候補表示）</p>
+      <input type="text" id="acupoint-search-input" placeholder="例: 百会 / ひゃくえ">
+      <div class="suggestion-wrapper">
+        <ul id="acupoint-suggestion-list" class="hidden"></ul>
+      </div>
+      <button id="search-btn">検索</button>
+      <p style="font-size:0.75rem;color:#666;margin-top:4px;">※スペースは自動で無視します。</p>
     </div>
-    <div class="info-container">
-      <h2 id="result-name">（経穴名）</h2>
 
-      <h3>経絡</h3>
-      <p id="result-meridian">（経絡未登録）</p>
-
-      <h3>経穴</h3>
-      <p id="result-point">（経穴未登録）</p>
-
-      <h3>部位</h3>
-      <p id="result-region">（部位未登録）</p>
-
-      <h3>要穴</h3>
-      <p id="result-important">（要穴未登録）</p>
-
-      <h3>関連する症状（デモ）</h3>
-      <ul id="related-symptoms">
-        <li>（関連症状未登録）</li>
-      </ul>
+    <div class="selection-container">
+      <h2>症状・病床から選択</h2>
+      <p>症状や病床を選択してください（デモ）</p>
+      <select id="symptom-select">
+        <option value="">-- 選択してください --</option>
+        <option value="symptom_demo1">デモ症状: 頭痛</option>
+        <option value="symptom_demo2">デモ症状: 首肩こり</option>
+      </select>
     </div>
-  </div>
-</section>
+  </section>
 
-    <!-- 3. 症状別経穴一覧画面 -->
-    <section id="symptom-result-screen" class="hidden">
-        <button class="back-to-main-btn">← メイン画面に戻る</button>
-        <h2 id="symptom-result-title">デモ症状: 頭痛</h2>
-        <div class="result-layout">
-            <div class="model-container">
-                <div class="placeholder"><p>ここに3Dモデル（複数経穴）</p></div>
-            </div>
-            <div class="info-container">
-                <h3>関連する経穴一覧</h3>
-                <ul id="symptom-acupoints-list">
-                    <li>（デモ）長強 (ちょうきょう)</li>
-                </ul>
-                <p>※クリックで詳細画面へ</p>
-            </div>
-        </div>
-    </section>
+  <!-- 2. 経穴詳細画面 -->
+  <section id="acupoint-result-screen" class="hidden">
+    <button class="back-to-main-btn">← メイン画面に戻る</button>
+    <div class="result-layout">
+      <div class="model-container">
+        <div class="placeholder"><p>ここに3Dモデル（単一経穴）</p></div>
+      </div>
+      <div class="info-container">
+        <h2 id="result-name">（経穴名）</h2>
+
+        <h3>経絡</h3>
+        <p id="result-meridian">（経絡未登録）</p>
+
+        <h3>経穴</h3>
+        <p id="result-point">（経穴未登録）</p>
+
+        <h3>部位</h3>
+        <p id="result-region">（部位未登録）</p>
+
+        <h3>要穴</h3>
+        <p id="result-important">（要穴未登録）</p>
+
+        <h3>関連する症状（デモ）</h3>
+        <ul id="related-symptoms">
+          <li>（関連症状未登録）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 症状別経穴一覧画面 -->
+  <section id="symptom-result-screen" class="hidden">
+    <button class="back-to-main-btn">← メイン画面に戻る</button>
+    <h2 id="symptom-result-title">デモ症状: 頭痛</h2>
+    <div class="result-layout">
+      <div class="model-container">
+        <div class="placeholder"><p>ここに3Dモデル（複数経穴）</p></div>
+      </div>
+      <div class="info-container">
+        <h3>関連する経穴一覧</h3>
+        <ul id="symptom-acupoints-list">
+          <li>（関連経穴なし）</li>
+        </ul>
+        <p style="font-size:0.75rem;color:#666;">※クリックで詳細へ遷移</p>
+      </div>
+    </div>
+  </section>
 </main>
 
 <script src="app.js"></script>
