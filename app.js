@@ -1,23 +1,17 @@
 /******************************************************
- * 経穴検索（整理済み完全版）
- * - CSV: 経穴・経絡.csv から全経穴（想定361穴）読込
- * - 経穴名内部の全Unicode空白を除去して正規化
- * - 見出し：行頭の「数字.(任意)経絡名」や「14足の厥陰肝経」形式を検出
- * - ひらがな入力: 読み 前方一致 → 0件なら 読み 部分一致 fallback
- * - 漢字/その他入力: 経穴名 部分一致
- * - 結果画面：経絡 / 部位 / 要穴（“経穴”見出しは非表示仕様）
- * - キャッシュバスティング：APP_VERSION を fetch に付与
- * - 読み辞書に無い経穴は漢字検索のみ（自動推定は誤読防止で実施しない）
+ * 経穴検索（半角スペース除去不備 修正済み版）
+ * - CSV 内 “足 三 里” などに含まれる半角スペース(U+0020)も除去
+ * - ひらがな検索で「あしさんり」等がヒットするよう修正
+ * - 読み取得時に空白削除キーでも再トライ
  ******************************************************/
 
-const APP_VERSION = '20250918-1';
+const APP_VERSION = '20250918-2'; // FIX: version up (cache bust)
 const CSV_FILE = '経穴・経絡.csv';
 const CSV_PATH = encodeURI(CSV_FILE);
 const MIN_QUERY_LENGTH = 1;
 const EXPECTED_TOTAL = 361;
 
-/* ===== 読み辞書（空白除去済み経穴名 -> ひらがな） =====
-   省略せず全体を維持（必要に応じ追加可） */
+/* 読み辞書（省略せず現在のもの） */
 const READINGS = {
   /* 督脈 */
   "長強":"ちょうきょう","腰兪":"ようゆ","腰陽関":"ようようかん","命門":"めいもん","懸枢":"けんすう","脊中":"せきちゅう",
@@ -102,11 +96,11 @@ const READINGS = {
   "章門":"しょうもん","期門":"きもん"
 };
 
-/* ===== 変数 ===== */
+/* ===== 状態 ===== */
 let ACUPOINTS = [];
 let DATA_READY = false;
 
-/* ===== DOM 取得 ===== */
+/* ===== DOM ===== */
 const inputEl = document.getElementById('acupoint-search-input');
 const suggestionListEl = document.getElementById('acupoint-suggestion-list');
 const searchBtn = document.getElementById('search-btn');
@@ -128,7 +122,7 @@ const symptomAcupointsListEl = document.getElementById('symptom-acupoints-list')
 
 /* ===== デモ症状 ===== */
 const SYMPTOMS = {
-  symptom_demo1: { label: 'デモ症状: 頭痛', related: ['百会','風府','霊台'] },
+  symptom_demo1: { label: 'デモ症状: 頭痛',   related: ['百会','風府','霊台'] },
   symptom_demo2: { label: 'デモ症状: 首肩こり', related: ['風府','強間','肩井'] }
 };
 
@@ -136,8 +130,9 @@ const SYMPTOMS = {
 function normalizeNFC(s){ return s ? s.normalize('NFC') : ''; }
 function removeAllUnicodeSpaces(str){
   return normalizeNFC(str||'')
+    // FIX: 通常半角スペース(\u0020)も除去対象に追加
     .replace(/[\u0000-\u001F\u007F]/g,'')
-    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g,'')
+    .replace(/[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g,'')
     .replace(/\uFEFF/g,'');
 }
 function normalizePointName(raw){ return removeAllUnicodeSpaces(raw); }
@@ -162,25 +157,24 @@ function parseCSV(text){
     const cols = line.split(',');
     const headCell = cols[0] ? cols[0].trim() : '';
 
-    // 見出し行: 1.督脈 / 14足の厥陰肝経 など
     if(/^\s*\d+(\.|．)?/.test(headCell)){
       currentMeridian = normalizePointName(headCell.replace(/^\s*\d+(\.|．)?\s*/,''));
       continue;
     }
-
-    // ヘッダ行
     if(/経絡/.test(headCell) && /経穴/.test(cols[1]||'')) continue;
-
     if(cols.length < 2) continue;
 
-    let meridian = normalizePointName(headCell) || currentMeridian;
-    let pointRaw = trimOuter(cols[1]||'');
+    let meridian  = normalizePointName(headCell) || currentMeridian;
+    let pointRaw  = trimOuter(cols[1]||'');
     let pointName = normalizePointName(pointRaw);
     if(!pointName) continue;
 
-    const region = trimOuter(cols[2]||'');
+    const region    = trimOuter(cols[2]||'');
     const important = trimOuter(cols[3]||'');
-    const reading = (READINGS[pointName] || '').trim();
+
+    // FIX: 読み取得時に空白削除版キーを必ず使用
+    const keyNoSpace = pointName; // 既に全空白除去後
+    const reading = (READINGS[keyNoSpace] || '').trim();
 
     out.push({
       id: pointName,
@@ -194,7 +188,7 @@ function parseCSV(text){
   return out;
 }
 
-/* ===== 検索ロジック ===== */
+/* ===== 検索 ===== */
 function filterPoints(qInput){
   const q = removeAllUnicodeSpaces(qInput);
   if(q.length < MIN_QUERY_LENGTH) return [];
@@ -245,13 +239,9 @@ function handleSuggestionKeyboard(e){
   if(!items.length) return;
   let current = items.findIndex(li=>li.classList.contains('active'));
   if(e.key==='ArrowDown'){
-    e.preventDefault();
-    current = (current+1)%items.length;
-    setActive(items,current);
+    e.preventDefault(); current = (current+1)%items.length; setActive(items,current);
   } else if(e.key==='ArrowUp'){
-    e.preventDefault();
-    current = (current-1+items.length)%items.length;
-    setActive(items,current);
+    e.preventDefault(); current = (current-1+items.length)%items.length; setActive(items,current);
   } else if(e.key==='Enter'){
     e.preventDefault();
     const act = items[current>=0?current:0];
@@ -356,7 +346,7 @@ inputEl.addEventListener('keydown',e=>{
 });
 searchBtn.addEventListener('click', runSearch);
 
-/* ===== 外側クリックでサジェスト閉 ===== */
+/* ===== 外側クリック ===== */
 document.addEventListener('click',e=>{
   if(!e.target.closest('.suggestion-wrapper') &&
      !e.target.closest('#acupoint-search-input')){
@@ -392,7 +382,6 @@ async function loadCSV(){
     ACUPOINTS = parsed;
     DATA_READY = true;
 
-    // サマリ
     const byMeridian = {};
     for(const p of ACUPOINTS){
       byMeridian[p.meridian] = (byMeridian[p.meridian]||0)+1;
@@ -404,12 +393,11 @@ async function loadCSV(){
     statusEl.textContent = `CSV 読み込み完了: ${total} 件 ${okMark}${missing?` / 読み欠:${missing}`:''}`;
     statusEl.title = Object.entries(byMeridian).map(([m,c])=>`${m}:${c}`).join(' / ');
 
-    // デバッグ用
     window._debugAcu = () => ({
       total,
       byMeridian,
       missingReadings: ACUPOINTS.filter(p=>!p.reading).map(p=>p.name),
-      first: ACUPOINTS.slice(0,5)
+      sample: ACUPOINTS.slice(0,10).map(p=>[p.name,p.reading])
     });
     console.log('[ACUPOINTS]', window._debugAcu());
 
