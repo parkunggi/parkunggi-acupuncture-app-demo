@@ -20,7 +20,7 @@
       <input
         type="text"
         id="acupoint-search-input"
-        placeholder="例: 百会 / ひゃくえ / ごうこく"
+        placeholder="例: 百会 / ひゃくえ / 合谷 / さんいんこう"
         autocomplete="off"
         aria-autocomplete="list"
         aria-haspopup="listbox"
@@ -31,7 +31,9 @@
         <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
       </div>
       <button id="search-btn" type="button">検索</button>
-      <p style="font-size:0.75rem;color:#666;margin-top:4px;">※スペースは自動で無視 / ひらがなは前方一致、漢字は部分一致</p>
+      <p style="font-size:0.7rem;color:#666;margin-top:4px;">
+        ※経穴名内部のすべての空白は自動除去 / ひらがなは前方一致・漢字は部分一致
+      </p>
       <p id="data-load-status" style="font-size:0.7rem;color:#888;margin-top:2px;">CSV 読み込み中...</p>
     </div>
 
@@ -59,7 +61,7 @@
         <h3>経絡</h3>
         <p id="result-meridian">（経絡未登録）</p>
 
-        <!-- “経穴” 項目は非表示（削除済） -->
+        <!-- “経穴” 項目は非表示 -->
 
         <h3>部位</h3>
         <p id="result-region">（部位未登録）</p>
