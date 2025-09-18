@@ -16,13 +16,14 @@
   <section id="main-screen">
     <div class="search-container">
       <h2>経穴検索</h2>
-      <p>経穴名を入力してください（2文字以上で候補表示）</p>
-      <input type="text" id="acupoint-search-input" placeholder="例: 百会 / ひゃくえ">
+      <p>経穴名（漢字 または ひらがな）を入力してください（1文字以上で候補表示）</p>
+      <input type="text" id="acupoint-search-input" placeholder="例: 百会 / ひゃくえ / ごうこく">
       <div class="suggestion-wrapper">
-        <ul id="acupoint-suggestion-list" class="hidden"></ul>
+        <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
       </div>
       <button id="search-btn">検索</button>
-      <p style="font-size:0.75rem;color:#666;margin-top:4px;">※スペースは自動で無視します。</p>
+      <p style="font-size:0.75rem;color:#666;margin-top:4px;">※スペースは自動で無視します / ひらがなは前方一致</p>
+      <p id="data-load-status" style="font-size:0.7rem;color:#888;margin-top:2px;">CSV 読み込み中...</p>
     </div>
 
     <div class="selection-container">
@@ -49,7 +50,7 @@
         <h3>経絡</h3>
         <p id="result-meridian">（経絡未登録）</p>
 
-        <!-- 経穴 見出しと本文を削除しました -->
+        <!-- “経穴” 項目削除（ご要望どおり） -->
 
         <h3>部位</h3>
         <p id="result-region">（部位未登録）</p>
