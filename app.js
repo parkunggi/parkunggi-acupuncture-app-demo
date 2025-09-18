@@ -42,7 +42,7 @@ const ACUPOINTS = [
  * 症状デモデータ
  ******************************************************/
 const SYMPTOMS = {
-  symptom_demo1: { label: 'デモ症状: 頭痛', related: ['hyakue', 'fufu', 'reidai'] },
+  symptom_demo1: { label: 'デモ症状: 頭痛',     related: ['hyakue', 'fufu', 'reidai'] },
   symptom_demo2: { label: 'デモ症状: 首肩こり', related: ['fufu', 'kyokan'] }
 };
 
@@ -57,16 +57,15 @@ const mainScreen = document.getElementById('main-screen');
 const acupointResultScreen = document.getElementById('acupoint-result-screen');
 const symptomResultScreen = document.getElementById('symptom-result-screen');
 
-const resultNameEl = document.getElementById('result-name');
-const resultMeridianEl  = document.getElementById('result-meridian');
-const resultPointEl     = document.getElementById('result-point');
-const resultRegionEl    = document.getElementById('result-region');
-const resultImportantEl = document.getElementById('result-important');
-const relatedSymptomsEl = document.getElementById('related-symptoms');
+const resultNameEl       = document.getElementById('result-name');
+const resultMeridianEl   = document.getElementById('result-meridian');
+const resultRegionEl     = document.getElementById('result-region');
+const resultImportantEl  = document.getElementById('result-important');
+const relatedSymptomsEl  = document.getElementById('related-symptoms');
 
-const symptomSelect = document.getElementById('symptom-select');
-const symptomResultTitleEl = document.getElementById('symptom-result-title');
-const symptomAcupointsListEl = document.getElementById('symptom-acupoints-list');
+const symptomSelect            = document.getElementById('symptom-select');
+const symptomResultTitleEl     = document.getElementById('symptom-result-title');
+const symptomAcupointsListEl   = document.getElementById('symptom-acupoints-list');
 
 /******************************************************
  * 画面切替
@@ -163,7 +162,7 @@ function selectAcupoint(point) {
 function showAcupointDetail(point) {
   resultNameEl.textContent      = `${point.kanji} (${point.kana})`;
   resultMeridianEl.textContent  = point.meridian  || '（経絡未登録）';
-  resultPointEl.textContent     = point.kanji     || '（経穴未登録）';
+  // 経穴項目削除に伴い resultPointEl の表示は行わない
   resultRegionEl.textContent    = point.region    || '（部位未登録）';
   resultImportantEl.textContent = point.important || '（要穴未登録）';
   relatedSymptomsEl.innerHTML   = '<li>（関連症状未登録）</li>';
