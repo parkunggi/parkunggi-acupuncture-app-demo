@@ -1,5 +1,5 @@
 /* 基本的なスタイルリセット */
-body, h1, h2, h3, p, ul, ol, li, input, select, button, textarea {
+body, h1, h2, h3, p, ul, ol, li, input, select, button {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -130,7 +130,7 @@ button:hover, .back-to-main-btn:hover {
     margin-bottom: 1.5rem;
 }
 
-/* 経穴詳細画面の個別スタイル */
+/* 経穴詳細画面 */
 #result-name {
     margin-bottom: 1.5rem;
 }
@@ -152,25 +152,7 @@ button:hover, .back-to-main-btn:hover {
     margin-bottom: 0.5rem;
 }
 
-textarea#memo-area {
-    width: 100%;
-    height: 100px;
-    padding: 0.8rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-    margin-bottom: 1rem;
-}
-
-#save-memo-btn {
-    background-color: #5cb85c;
-}
-
-#save-memo-btn:hover {
-    background-color: #4cae4c;
-}
-
-/* 症状別一覧画面の個別スタイル */
+/* 症状別一覧画面 */
 #symptom-acupoints-list a {
     color: #4a90e2;
     text-decoration: none;
