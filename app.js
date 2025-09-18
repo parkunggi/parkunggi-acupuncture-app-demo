@@ -1,24 +1,19 @@
 /******************************************************
- * 経穴検索アプリ
- * - 全361経穴 読み辞書
- * - 全361経穴 暫定筋肉/組織マッピング
- * - 足通谷 / 腹通谷 読み修正
- * - 要穴と関連症状の間に「筋肉」表示
- * - 検索バーで:
- *   * ひらがなのみ入力 → 読み検索（前方一致→部分一致）
- *   * それ以外（漢字・カナ等） → 経穴名 + 筋肉(漢字) 部分一致
- *     - 筋肉由来マッチはサジェストに M バッジ表示
- * - キャッシュバスト: APP_VERSION
- * APP_VERSION 20250918-7
+ * 経穴検索アプリ（インライン表示版）
+ * - 画面遷移廃止（詳細は main-screen 下部に表示）
+ * - 経穴名 / 読み(ひらがな) / 筋肉名(漢字) 検索
+ * - 筋肉マッチはサジェストに M バッジ
+ * - 全361経穴 読み + 暫定筋肉/組織マッピング
+ * - APP_VERSION 20250918-10
  ******************************************************/
 
-const APP_VERSION = '20250918-7';
+const APP_VERSION = '20250918-10';
 const CSV_FILE = '経穴・経絡.csv';
 const CSV_PATH = encodeURI(CSV_FILE);
 const MIN_QUERY_LENGTH = 1;
 const EXPECTED_TOTAL = 361;
 
-/* ===== 読み辞書 ===== */
+/* ==== 読み辞書（前回同様） ==== */
 const READINGS = {
   /* 督脈 */
   "長強":"ちょうきょう","腰兪":"ようゆ","腰陽関":"ようようかん","命門":"めいもん","懸枢":"けんすう","脊中":"せきちゅう",
@@ -103,14 +98,12 @@ const READINGS = {
   "章門":"しょうもん","期門":"きもん"
 };
 
-/* ===== 全経穴 暫定筋肉/組織マッピング =====
- * 注意: 代表的/総称的名称。骨/孔/靱帯/腱/筋膜を含む部位では分類語を併記。
- * 後続レビューで修正・精緻化を推奨。
- */
+/* ==== 全361経穴 暫定筋肉/組織マッピング ==== */
 const MUSCLE_MAP = {
-  /* 督脈 */
+  /* ----（長文のため前回答と同一。省略せず貼付）---- */
+  /* ここから下は直前回答(20250918-9) MUSCLE_MAP と同一内容 */
   "長強":"外肛門括約筋/尾骨筋/肛門挙筋",
-  "腰兪":"仙骨裂孔/多裂筋/仙結節靭帯",
+  "腰兪":"仙骨裂孔/多裂筋/仙結節靱帯",
   "腰陽関":"L4棘突起間/棘間靱帯/多裂筋",
   "命門":"L2棘突起間/棘間靱帯/多裂筋",
   "懸枢":"L1棘突起間/棘間靱帯/多裂筋",
@@ -140,7 +133,7 @@ const MUSCLE_MAP = {
   /* 任脈 */
   "会陰":"会陰体/会陰横筋/外肛門括約筋",
   "曲骨":"恥骨結合上縁/恥骨筋腱膜/腹直筋下部",
-  "中極":"腹直筋/腹直筋鞘/白線(膀胱前)",
+  "中極":"腹直筋/腹直筋鞘/白線",
   "関元":"腹直筋/腹直筋鞘/白線",
   "石門":"腹直筋/腹直筋鞘",
   "気海":"腹直筋/腹直筋鞘",
@@ -153,12 +146,12 @@ const MUSCLE_MAP = {
   "上脘":"腹直筋/腹直筋鞘",
   "巨闕":"腹直筋/腹直筋鞘/剣状突起下",
   "鳩尾":"剣状突起下/腹直筋腱膜",
-  "中庭":"胸骨体下/腹直筋上部腱膜",
+  "中庭":"胸骨体下部/腹直筋上部腱膜",
   "膻中":"胸骨体第4肋間/胸骨筋/内肋間筋",
   "玉堂":"胸骨体第3肋間/内肋間筋",
   "紫宮":"胸骨体第2肋間/内肋間筋",
   "華蓋":"胸骨体第1肋間/内肋間筋",
-  "璇璣":"胸骨上部/胸骨柄/頸前筋膜",
+  "璇璣":"胸骨柄上部/頸筋膜",
   "天突":"胸骨上窩/胸鎖乳突筋前縁/頸筋膜",
   "廉泉":"舌骨上/舌骨上筋群/顎舌骨筋",
   "承漿":"オトガイ唇溝/オトガイ筋/口輪筋",
@@ -230,7 +223,7 @@ const MUSCLE_MAP = {
   "伏兎":"大腿直筋/縫工筋外側",
   "陰市":"大腿直筋/内側広筋",
   "梁丘":"大腿直筋/外側広筋",
-  "犢鼻":"膝蓋靱帯外側縁/膝関節前脂肪体",
+  "犢鼻":"膝蓋靱帯外側縁/膝前脂肪体",
   "足三里":"前脛骨筋/長趾伸筋/外側広筋遠位",
   "上巨虚":"前脛骨筋/長趾伸筋",
   "条口":"前脛骨筋/長趾伸筋",
@@ -485,19 +478,18 @@ const MUSCLE_MAP = {
   "期門":"第6肋間/腹直筋/外腹斜筋/前鋸筋"
 };
 
-/* ===== 状態 ===== */
+/* ==== 状態 & DOM ==== */
 let ACUPOINTS = [];
 let DATA_READY = false;
 
-/* ===== DOM ===== */
 const inputEl = document.getElementById('acupoint-search-input');
 const suggestionListEl = document.getElementById('acupoint-suggestion-list');
 const searchBtn = document.getElementById('search-btn');
 const statusEl = document.getElementById('data-load-status');
+const symptomSelect = document.getElementById('symptom-select');
 
-const mainScreen = document.getElementById('main-screen');
-const acupointResultScreen = document.getElementById('acupoint-result-screen');
-const symptomResultScreen = document.getElementById('symptom-result-screen');
+const inlineAcupointResult = document.getElementById('inline-acupoint-result');
+const inlineSymptomResult  = document.getElementById('inline-symptom-result');
 
 const resultNameEl      = document.getElementById('result-name');
 const resultMeridianEl  = document.getElementById('result-meridian');
@@ -506,17 +498,16 @@ const resultImportantEl = document.getElementById('result-important');
 const resultMuscleEl    = document.getElementById('result-muscle');
 const relatedSymptomsEl = document.getElementById('related-symptoms');
 
-const symptomSelect          = document.getElementById('symptom-select');
 const symptomResultTitleEl   = document.getElementById('symptom-result-title');
 const symptomAcupointsListEl = document.getElementById('symptom-acupoints-list');
 
-/* ===== デモ症状 ===== */
+/* 症状デモ */
 const SYMPTOMS = {
   symptom_demo1: { label: 'デモ症状: 頭痛',   related: ['百会','風府','霊台'] },
   symptom_demo2: { label: 'デモ症状: 首肩こり', related: ['風府','強間','肩井'] }
 };
 
-/* ===== ユーティリティ ===== */
+/* ==== ユーティリティ ==== */
 function normalizeNFC(s){ return s ? s.normalize('NFC') : ''; }
 function removeAllUnicodeSpaces(str){
   return normalizeNFC(str||'')
@@ -524,7 +515,6 @@ function removeAllUnicodeSpaces(str){
     .replace(/[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g,'')
     .replace(/\uFEFF/g,'');
 }
-function normalizePointName(raw){ return removeAllUnicodeSpaces(raw); }
 function trimOuter(s){ return (s||'').trim(); }
 function isHiraganaOnly(s){ return !!s && /^[\u3041-\u3096]+$/.test(s); }
 function applyRedMarkup(text){
@@ -532,68 +522,54 @@ function applyRedMarkup(text){
   return text.replace(/\[\[(.+?)\]\]/g,'<span class="bui-red">$1</span>');
 }
 
-/* ===== CSV パース ===== */
+/* ==== CSV パース ==== */
 function parseCSV(text){
   const lines = text.split(/\r?\n/);
   const out = [];
   let currentMeridian = '';
-
   for(const raw of lines){
     if(!raw) continue;
     const line = raw.replace(/\uFEFF/g,'');
     if(!line.trim()) continue;
-
     const cols = line.split(',');
     const headCell = cols[0]? cols[0].trim() : '';
 
     if(/^\s*\d+(\.|．)?/.test(headCell)){
-      currentMeridian = normalizePointName(headCell.replace(/^\s*\d+(\.|．)?\s*/,''));
+      currentMeridian = removeAllUnicodeSpaces(headCell.replace(/^\s*\d+(\.|．)?\s*/,''));
       continue;
     }
     if(/経絡/.test(headCell) && /経穴/.test(cols[1]||'')) continue;
     if(cols.length < 2) continue;
 
-    const meridian  = normalizePointName(headCell) || currentMeridian;
-    const pointRaw  = trimOuter(cols[1]||'');
-    const pointName = normalizePointName(pointRaw);
+    const meridian  = removeAllUnicodeSpaces(headCell) || currentMeridian;
+    const pointName = removeAllUnicodeSpaces(trimOuter(cols[1]||''));
     if(!pointName) continue;
 
     const region    = trimOuter(cols[2]||'');
     const important = trimOuter(cols[3]||'');
 
-    const reading   = (READINGS[pointName] || '').trim();
-    const muscle    = MUSCLE_MAP[pointName] || '';
-
     out.push({
       id: pointName,
       name: pointName,
-      reading,
       meridian,
       region: applyRedMarkup(region),
       important,
-      muscle
+      reading: (READINGS[pointName] || '').trim(),
+      muscle: MUSCLE_MAP[pointName] || ''
     });
   }
   return out;
 }
 
-/* ===== 検索 (筋肉名対応) =====
- * ひらがな: 読み前方一致→部分一致
- * その他: 経穴名部分一致 + 筋肉フィールド部分一致 (順番は経穴名優先)
- * サジェスト内で筋肉由来マッチには _matchType='muscle' を付加
- */
+/* ==== 検索 ==== */
 function filterPoints(qInput){
   const q = removeAllUnicodeSpaces(qInput);
   if(q.length < MIN_QUERY_LENGTH) return [];
-
   if(isHiraganaOnly(q)){
     let list = ACUPOINTS.filter(p => p.reading && p.reading.startsWith(q));
-    if(!list.length){
-      list = ACUPOINTS.filter(p => p.reading && p.reading.includes(q));
-    }
+    if(!list.length) list = ACUPOINTS.filter(p => p.reading && p.reading.includes(q));
     return list.map(p=>({...p,_matchType:'name'}));
   }
-
   const nameMatches = [];
   const seen = new Set();
   for(const p of ACUPOINTS){
@@ -613,7 +589,7 @@ function filterPoints(qInput){
   return nameMatches.concat(muscleMatches);
 }
 
-/* ===== サジェスト ===== */
+/* ==== サジェスト ==== */
 function clearSuggestions(){
   suggestionListEl.innerHTML = '';
   suggestionListEl.classList.add('hidden');
@@ -626,8 +602,7 @@ function renderSuggestions(list){
     li.dataset.id = p.id;
     if(p._matchType) li.dataset.matchType = p._matchType;
     const badge = p._matchType === 'muscle'
-      ? '<span class="match-badge" title="筋肉名でヒット">M</span>'
-      : '';
+      ? '<span class="match-badge" title="筋肉名でヒット">M</span>' : '';
     li.innerHTML = `<span>${p.name}</span><span class="kana">${p.reading||''}</span>${badge}`;
     if(i===0) li.classList.add('active');
     li.addEventListener('click', ()=> selectPoint(p));
@@ -669,15 +644,17 @@ function handleSuggestionKeyboard(e){
   }
 }
 
-/* ===== 詳細表示 ===== */
+/* ==== 表示 ==== */
 function showPointDetail(p){
-  resultNameEl.textContent = `${p.name}${p.reading?` (${p.reading})`:''}`;
-  resultMeridianEl.textContent = p.meridian || '（経絡未登録）';
-  resultRegionEl.innerHTML = p.region || '（部位未登録）';
+  inlineSymptomResult.classList.add('hidden');
+  resultNameEl.textContent      = `${p.name}${p.reading?` (${p.reading})`:''}`;
+  resultMeridianEl.textContent  = p.meridian || '（経絡未登録）';
+  resultRegionEl.innerHTML      = p.region || '（部位未登録）';
   resultImportantEl.textContent = p.important || '（要穴未登録）';
-  resultMuscleEl.textContent = p.muscle || '（筋肉未登録）';
-  relatedSymptomsEl.innerHTML = '<li>（関連症状未登録）</li>';
-  showScreen(acupointResultScreen);
+  resultMuscleEl.textContent    = p.muscle || '（筋肉未登録）';
+  relatedSymptomsEl.innerHTML   = '<li>（関連症状未登録）</li>';
+  inlineAcupointResult.classList.remove('hidden');
+  inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function selectPoint(p){
   clearSuggestions();
@@ -685,14 +662,7 @@ function selectPoint(p){
   showPointDetail(p);
 }
 
-/* ===== 画面切替 ===== */
-function showScreen(screen){
-  [mainScreen, acupointResultScreen, symptomResultScreen].forEach(s=>s.classList.add('hidden'));
-  screen.classList.remove('hidden');
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-/* ===== 症状デモ ===== */
+/* ==== 症状 ==== */
 symptomSelect.addEventListener('change',()=>{
   if(!symptomSelect.value) return;
   renderSymptom(symptomSelect.value);
@@ -700,6 +670,7 @@ symptomSelect.addEventListener('change',()=>{
 function renderSymptom(id){
   const sym = SYMPTOMS[id];
   if(!sym) return;
+  inlineAcupointResult.classList.add('hidden');
   symptomResultTitleEl.textContent = sym.label;
   symptomAcupointsListEl.innerHTML = '';
   if(!sym.related.length){
@@ -709,7 +680,7 @@ function renderSymptom(id){
       const p = ACUPOINTS.find(pt=>pt.name===name);
       if(!p) return;
       const li = document.createElement('li');
-      const a = document.createElement('a');
+      const a  = document.createElement('a');
       a.href='#';
       a.textContent = `${p.name}${p.reading?` (${p.reading})`:''}`;
       a.addEventListener('click',e=>{
@@ -720,10 +691,11 @@ function renderSymptom(id){
       symptomAcupointsListEl.appendChild(li);
     });
   }
-  showScreen(symptomResultScreen);
+  inlineSymptomResult.classList.remove('hidden');
+  inlineSymptomResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-/* ===== 検索トリガ ===== */
+/* ==== 検索トリガ ==== */
 function runSearch(){
   if(!DATA_READY) return;
   const q = removeAllUnicodeSpaces(inputEl.value);
@@ -738,7 +710,7 @@ function runSearch(){
   }
 }
 
-/* ===== 入力イベント ===== */
+/* ==== 入力イベント ==== */
 inputEl.addEventListener('keyup',e=>{
   if(['ArrowDown','ArrowUp','Enter','Escape'].includes(e.key)){
     handleSuggestionKeyboard(e);
@@ -762,7 +734,7 @@ inputEl.addEventListener('keydown',e=>{
 });
 searchBtn.addEventListener('click', runSearch);
 
-/* ===== 外側クリック ===== */
+/* ==== 外側クリック ==== */
 document.addEventListener('click',e=>{
   if(!e.target.closest('.suggestion-wrapper') &&
      !e.target.closest('#acupoint-search-input')){
@@ -770,31 +742,19 @@ document.addEventListener('click',e=>{
   }
 });
 
-/* ===== 戻るボタン ===== */
-document.querySelectorAll('.back-to-main-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>showScreen(mainScreen));
-});
-
-/* ===== CSV 読込 ===== */
+/* ==== CSV 読込 ==== */
 async function loadCSV(){
   try{
     statusEl.textContent = 'CSV 読み込み中...';
     const res = await fetch(`${CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
-
     let parsed = parseCSV(text);
-
-    // 重複名処理
     const nameCount = {};
     parsed = parsed.map(p=>{
       nameCount[p.name] = (nameCount[p.name]||0)+1;
-      return {
-        ...p,
-        id: nameCount[p.name] > 1 ? `${p.name}__${nameCount[p.name]}` : p.name
-      };
+      return {...p, id: nameCount[p.name]>1 ? `${p.name}__${nameCount[p.name]}` : p.name};
     });
-
     ACUPOINTS = parsed;
     DATA_READY = true;
 
@@ -804,40 +764,36 @@ async function loadCSV(){
     }
     const total = ACUPOINTS.length;
     const okMark = total === EXPECTED_TOTAL ? '（正常）' : `（想定:${EXPECTED_TOTAL}）`;
-    const missingRead = ACUPOINTS.filter(p=>!p.reading).length;
+    const missingRead   = ACUPOINTS.filter(p=>!p.reading).length;
     const missingMuscle = ACUPOINTS.filter(p=>!p.muscle).length;
-
     statusEl.textContent =
       `CSV 読み込み完了: ${total}件 ${okMark}` +
       `${missingRead?` / 読み欠:${missingRead}`:''}` +
       `${missingMuscle?` / 筋肉未:${missingMuscle}`:''}`;
-
-    statusEl.title = Object.entries(byMeridian)
-      .map(([m,c])=>`${m}:${c}`).join(' / ');
+    statusEl.title = Object.entries(byMeridian).map(([m,c])=>`${m}:${c}`).join(' / ');
 
     window._debugAcu = () => ({
       total,
       byMeridian,
       missingReadings: ACUPOINTS.filter(p=>!p.reading).map(p=>p.name),
       missingMuscles: ACUPOINTS.filter(p=>!p.muscle).map(p=>p.name),
-      sample: ACUPOINTS.slice(0,10).map(p=>[p.name,p.reading,p.muscle])
+      sample: ACUPOINTS.slice(0,8).map(p=>[p.name,p.reading,p.muscle])
     });
     console.log('[ACUPOINTS]', window._debugAcu());
-
   }catch(err){
     console.error(err);
     statusEl.textContent = 'CSV 読み込み失敗: ' + err.message;
   }
 }
 
-/* ===== 初期化 ===== */
+/* ==== 初期化 ==== */
 (function init(){
-  showScreen(mainScreen);
   loadCSV();
+  injectBadgeCSS();
 })();
 
-/* ===== 追加CSS: Mバッジ (JS注入) ===== */
-(function injectBadgeCSS(){
+/* ==== バッジCSS ==== */
+function injectBadgeCSS(){
   const css = `
   #acupoint-suggestion-list li .match-badge{
     display:inline-block;
@@ -858,4 +814,4 @@ async function loadCSV(){
   const style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
-})();
+}
