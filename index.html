@@ -17,12 +17,21 @@
     <div class="search-container">
       <h2>経穴検索</h2>
       <p>経穴名（漢字 または ひらがな）を入力してください（1文字以上で候補表示）</p>
-      <input type="text" id="acupoint-search-input" placeholder="例: 百会 / ひゃくえ / ごうこく">
+      <input
+        type="text"
+        id="acupoint-search-input"
+        placeholder="例: 百会 / ひゃくえ / ごうこく"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        aria-owns="acupoint-suggestion-list"
+      >
       <div class="suggestion-wrapper">
         <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
       </div>
-      <button id="search-btn">検索</button>
-      <p style="font-size:0.75rem;color:#666;margin-top:4px;">※スペースは自動で無視します / ひらがなは前方一致</p>
+      <button id="search-btn" type="button">検索</button>
+      <p style="font-size:0.75rem;color:#666;margin-top:4px;">※スペースは自動で無視 / ひらがなは前方一致、漢字は部分一致</p>
       <p id="data-load-status" style="font-size:0.7rem;color:#888;margin-top:2px;">CSV 読み込み中...</p>
     </div>
 
@@ -39,7 +48,7 @@
 
   <!-- 2. 経穴詳細画面 -->
   <section id="acupoint-result-screen" class="hidden">
-    <button class="back-to-main-btn">← メイン画面に戻る</button>
+    <button class="back-to-main-btn" type="button">← メイン画面に戻る</button>
     <div class="result-layout">
       <div class="model-container">
         <div class="placeholder"><p>ここに3Dモデル（単一経穴）</p></div>
@@ -50,7 +59,7 @@
         <h3>経絡</h3>
         <p id="result-meridian">（経絡未登録）</p>
 
-        <!-- “経穴” 項目削除（ご要望どおり） -->
+        <!-- “経穴” 項目は非表示（削除済） -->
 
         <h3>部位</h3>
         <p id="result-region">（部位未登録）</p>
@@ -68,7 +77,7 @@
 
   <!-- 3. 症状別経穴一覧画面 -->
   <section id="symptom-result-screen" class="hidden">
-    <button class="back-to-main-btn">← メイン画面に戻る</button>
+    <button class="back-to-main-btn" type="button">← メイン画面に戻る</button>
     <h2 id="symptom-result-title">デモ症状: 頭痛</h2>
     <div class="result-layout">
       <div class="model-container">
