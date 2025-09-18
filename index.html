@@ -33,8 +33,7 @@
       </div>
       <button id="search-btn" type="button">検索</button>
       <p class="note-small">
-        ※内部で経穴名のすべての空白（全角/半角/NBSP）を除去して検索。
-        ひらがなは前方一致 → 0件時は部分一致 fallback / 漢字は部分一致。
+        ※内部で経穴名の全ての空白を正規化。ひらがな=前方一致→0件時に部分一致 / 漢字=部分一致。
       </p>
       <p id="data-load-status" class="note-status">CSV 読み込み中...</p>
     </div>
@@ -65,13 +64,14 @@
         <h3>経絡</h3>
         <p id="result-meridian">（経絡未登録）</p>
 
-        <!-- “経穴”見出しは仕様により非表示 -->
-
         <h3>部位</h3>
         <p id="result-region">（部位未登録）</p>
 
         <h3>要穴</h3>
         <p id="result-important">（要穴未登録）</p>
+
+        <h3>筋肉</h3>
+        <p id="result-muscle">（筋肉未登録）</p>
 
         <h3>関連する症状（デモ）</h3>
         <ul id="related-symptoms">
