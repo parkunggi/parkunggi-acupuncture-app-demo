@@ -1,39 +1,41 @@
 /******************************************************
- * 経穴データ（督脈 / 指定リスト）空白除去済み
- * location / effects はプレースホルダ
+ * 経穴データ
+ * - meridian: 経絡
+ * - region: 部位（簡易説明）
+ * - important: 要穴分類など
  ******************************************************/
 const ACUPOINTS = [
-  { id: 'chokyo',   kanji: '長強',   kana: 'ちょうきょう' },
-  { id: 'yoyu',     kanji: '腰兪',   kana: 'ようゆ' },
-  { id: 'yoyokan',  kanji: '腰陽関', kana: 'ようようかん' }, // 別読み追加時は kanaVariants を検討
-  { id: 'meimon',   kanji: '命門',   kana: 'めいもん' },
-  { id: 'kensu',    kanji: '懸枢',   kana: 'けんすう' },
-  { id: 'sekichu',  kanji: '脊中',   kana: 'せきちゅう' },
-  { id: 'chusu',    kanji: '中枢',   kana: 'ちゅうすう' },
-  { id: 'kinshuku', kanji: '筋縮',   kana: 'きんしゅく' },
-  { id: 'shiyo',    kanji: '至陽',   kana: 'しよう' },
-  { id: 'reidai',   kanji: '霊台',   kana: 'れいだい' },
-  { id: 'shindo',   kanji: '神道',   kana: 'しんどう' },
-  { id: 'shinchuu', kanji: '身柱',   kana: 'しんちゅう' },
-  { id: 'toudou',   kanji: '陶道',   kana: 'とうどう' },
-  { id: 'daitsui',  kanji: '大椎',   kana: 'だいつい' },
-  { id: 'amon',     kanji: '瘂門',   kana: 'あもん' },
-  { id: 'fufu',     kanji: '風府',   kana: 'ふうふ' },
-  { id: 'nouko',    kanji: '脳戸',   kana: 'のうこ' },
-  { id: 'kyokan',   kanji: '強間',   kana: 'きょうかん' },
-  { id: 'gocho',    kanji: '後頂',   kana: 'ごちょう' },
-  { id: 'hyakue',   kanji: '百会',   kana: 'ひゃくえ' },
-  { id: 'zencho',   kanji: '前頂',   kana: 'ぜんちょう' },
-  { id: 'shine',    kanji: '顖会',   kana: 'しんえ' },
-  { id: 'josei',    kanji: '上星',   kana: 'じょうせい' },
-  { id: 'shintei',  kanji: '神庭',   kana: 'しんてい' },
-  { id: 'soryo',    kanji: '素髎',   kana: 'そりょう' },
-  { id: 'suikou',   kanji: '水溝',   kana: 'すいこう' },
-  { id: 'datan',    kanji: '兌端',   kana: 'だたん' },
-  { id: 'ginko',    kanji: '齦交',   kana: 'ぎんこう' }
+  { id: 'chokyo',   kanji: '長強',   kana: 'ちょうきょう', meridian: '督脈', region: '尾骨端付近',          important: '（要穴未設定）' },
+  { id: 'yoyu',     kanji: '腰兪',   kana: 'ようゆ',       meridian: '督脈', region: '腰部正中線',          important: '（要穴未設定）' },
+  { id: 'yoyokan',  kanji: '腰陽関', kana: 'ようようかん', meridian: '督脈', region: '腰椎部',              important: '（要穴未設定）' },
+  { id: 'meimon',   kanji: '命門',   kana: 'めいもん',     meridian: '督脈', region: '腰椎2番棘突起下',      important: '（要穴未設定）' },
+  { id: 'kensu',    kanji: '懸枢',   kana: 'けんすう',     meridian: '督脈', region: '腰椎付近',            important: '（要穴未設定）' },
+  { id: 'sekichu',  kanji: '脊中',   kana: 'せきちゅう',   meridian: '督脈', region: '背部正中線',          important: '（要穴未設定）' },
+  { id: 'chusu',    kanji: '中枢',   kana: 'ちゅうすう',   meridian: '督脈', region: '背部',                important: '（要穴未設定）' },
+  { id: 'kinshuku', kanji: '筋縮',   kana: 'きんしゅく',   meridian: '督脈', region: '背部',                important: '（要穴未設定）' },
+  { id: 'shiyo',    kanji: '至陽',   kana: 'しよう',       meridian: '督脈', region: '背部胸椎下',          important: '（要穴未設定）' },
+  { id: 'reidai',   kanji: '霊台',   kana: 'れいだい',     meridian: '督脈', region: '背部胸椎付近',        important: '（要穴未設定）' },
+  { id: 'shindo',   kanji: '神道',   kana: 'しんどう',     meridian: '督脈', region: '背部',                important: '（要穴未設定）' },
+  { id: 'shinchuu', kanji: '身柱',   kana: 'しんちゅう',   meridian: '督脈', region: '上背部',              important: '（要穴未設定）' },
+  { id: 'toudou',   kanji: '陶道',   kana: 'とうどう',     meridian: '督脈', region: '上背部',              important: '（要穴未設定）' },
+  { id: 'daitsui',  kanji: '大椎',   kana: 'だいつい',     meridian: '督脈', region: '第7頸椎棘突起下',     important: '（要穴未設定）' },
+  { id: 'amon',     kanji: '瘂門',   kana: 'あもん',       meridian: '督脈', region: '後頸部',              important: '（要穴未設定）' },
+  { id: 'fufu',     kanji: '風府',   kana: 'ふうふ',       meridian: '督脈', region: '後頭部中央',          important: '（要穴未設定）' },
+  { id: 'nouko',    kanji: '脳戸',   kana: 'のうこ',       meridian: '督脈', region: '後頭上部',            important: '（要穴未設定）' },
+  { id: 'kyokan',   kanji: '強間',   kana: 'きょうかん',   meridian: '督脈', region: '頭頂部やや後方',      important: '（要穴未設定）' },
+  { id: 'gocho',    kanji: '後頂',   kana: 'ごちょう',     meridian: '督脈', region: '頭頂部',              important: '（要穴未設定）' },
+  { id: 'hyakue',   kanji: '百会',   kana: 'ひゃくえ',     meridian: '督脈', region: '頭頂正中',            important: '（要穴未設定）' },
+  { id: 'zencho',   kanji: '前頂',   kana: 'ぜんちょう',   meridian: '督脈', region: '頭頂部前寄り',        important: '（要穴未設定）' },
+  { id: 'shine',    kanji: '顖会',   kana: 'しんえ',       meridian: '督脈', region: '前頭寄り正中',        important: '（要穴未設定）' },
+  { id: 'josei',    kanji: '上星',   kana: 'じょうせい',   meridian: '督脈', region: '前頭部',              important: '（要穴未設定）' },
+  { id: 'shintei',  kanji: '神庭',   kana: 'しんてい',     meridian: '督脈', region: '前頭上部',            important: '（要穴未設定）' },
+  { id: 'soryo',    kanji: '素髎',   kana: 'そりょう',     meridian: '督脈', region: '鼻尖',                important: '（要穴未設定）' },
+  { id: 'suikou',   kanji: '水溝',   kana: 'すいこう',     meridian: '督脈', region: '人中溝中央',          important: '（要穴未設定）' },
+  { id: 'datan',    kanji: '兌端',   kana: 'だたん',       meridian: '督脈', region: '上唇正中',            important: '（要穴未設定）' },
+  { id: 'ginko',    kanji: '齦交',   kana: 'ぎんこう',     meridian: '督脈', region: '上歯齦裏正中',        important: '（要穴未設定）' }
 ].map(p => ({
   ...p,
-  searchable: p.kanji + p.kana
+  searchable: (p.kanji + p.kana + (p.meridian || '') + (p.region || '')).replace(/\s+/g, '')
 }));
 
 /******************************************************
@@ -56,16 +58,15 @@ const acupointResultScreen = document.getElementById('acupoint-result-screen');
 const symptomResultScreen = document.getElementById('symptom-result-screen');
 
 const resultNameEl = document.getElementById('result-name');
-const resultLocationEl = document.getElementById('result-location');
-const resultEffectsEl = document.getElementById('result-effects');
+const resultMeridianEl  = document.getElementById('result-meridian');
+const resultPointEl     = document.getElementById('result-point');
+const resultRegionEl    = document.getElementById('result-region');
+const resultImportantEl = document.getElementById('result-important');
 const relatedSymptomsEl = document.getElementById('related-symptoms');
 
 const symptomSelect = document.getElementById('symptom-select');
 const symptomResultTitleEl = document.getElementById('symptom-result-title');
 const symptomAcupointsListEl = document.getElementById('symptom-acupoints-list');
-
-const memoArea = document.getElementById('memo-area');
-const saveMemoBtn = document.getElementById('save-memo-btn');
 
 /******************************************************
  * 画面切替
@@ -87,7 +88,7 @@ function filterAcupoints(query) {
   if (!query) return [];
   const q = normalizeInput(query);
   if (q.length < 2) return [];
-  return ACUPOINTS.filter(p => p.searchable.includes(q));
+  return ACUPOINTS.filter(p => p.searchable.toLowerCase().includes(q));
 }
 
 /******************************************************
@@ -162,10 +163,11 @@ function selectAcupoint(point) {
 
 function showAcupointDetail(point) {
   resultNameEl.textContent = `${point.kanji} (${point.kana})`;
-  resultLocationEl.textContent = '（位置データ未登録）';
-  resultEffectsEl.innerHTML = '<li>（効果データ未登録）</li>';
+  resultMeridianEl.textContent  = point.meridian  || '（経絡未登録）';
+  resultPointEl.textContent     = point.kanji || '（経穴未登録）';
+  resultRegionEl.textContent    = point.region    || '（部位未登録）';
+  resultImportantEl.textContent = point.important || '（要穴未登録）';
   relatedSymptomsEl.innerHTML = '<li>（関連症状未登録）</li>';
-  memoArea.value = localStorage.getItem(`memo_${point.id}`) || '';
   showScreen(acupointResultScreen);
 }
 
@@ -203,21 +205,6 @@ function renderSymptom(id) {
     });
   }
   showScreen(symptomResultScreen);
-}
-
-/******************************************************
- * メモ保存
- ******************************************************/
-if (saveMemoBtn) {
-  saveMemoBtn.addEventListener('click', () => {
-    const current = resultNameEl.textContent;
-    const point = ACUPOINTS.find(p => current.startsWith(p.kanji));
-    if (!point) return;
-    localStorage.setItem(`memo_${point.id}`, memoArea.value);
-    const old = saveMemoBtn.textContent;
-    saveMemoBtn.textContent = '保存しました';
-    setTimeout(() => (saveMemoBtn.textContent = old), 1500);
-  });
 }
 
 /******************************************************
