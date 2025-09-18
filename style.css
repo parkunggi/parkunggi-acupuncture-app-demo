@@ -1,202 +1,193 @@
-/* 基本スタイルリセット */
-body, h1, h2, h3, p, ul, ol, li, input, select, button {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: sans-serif;
-}
-
+/* 基本レイアウト（元の構造を維持） */
 body {
-  background-color: #f4f4f9;
-  color: #333;
-  line-height: 1.6;
+  margin:0;
+  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP",sans-serif;
+  background:#f5f7fa;
+  color:#222;
+  line-height:1.6;
 }
-
 header {
-  background-color: #4a90e2;
-  color: #fff;
-  padding: 1rem 2rem;
-  text-align: center;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background:#0d6efd;
+  color:#fff;
+  padding:16px 20px;
+  text-align:center;
+}
+h1 { margin:0; font-size:1.4rem; }
+main { max-width:1100px; margin:28px auto 80px; padding:0 16px; }
+
+section { margin-bottom:40px; }
+.hidden { display:none !important; }
+
+.search-container, .selection-container {
+  background:#fff;
+  border:1px solid #dfe4ea;
+  padding:20px 22px 24px;
+  border-radius:14px;
+  margin-bottom:26px;
+  box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
 }
 
-main {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 0 2rem;
+.search-container h2, .selection-container h2 {
+  margin:0 0 8px;
+  font-size:1.15rem;
+  letter-spacing:.05em;
 }
 
-/* メイン画面 */
-#main-screen {
-  display: flex;
-  gap: 2rem;
-  justify-content: center;
+.search-container input {
+  width:100%;
+  font-size:1rem;
+  padding:11px 14px;
+  border:1px solid #c9d2dc;
+  border-radius:8px;
+  outline:none;
+  transition:.15s border-color,.15s box-shadow;
 }
-
-.search-container,
-.selection-container {
-  background: #fff;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  width: 45%;
+.search-container input:focus {
+  border-color:#0d6efd;
+  box-shadow:0 0 0 3px rgba(13,110,253,.2);
 }
-
-h2 {
-  margin-bottom: 0.5rem;
-  color: #4a90e2;
+#search-btn {
+  margin-top:10px;
+  padding:10px 22px;
+  background:#0d6efd;
+  border:none;
+  color:#fff;
+  font-weight:600;
+  border-radius:8px;
+  cursor:pointer;
+  letter-spacing:.05em;
+  box-shadow:0 3px 10px -4px rgba(13,110,253,.4);
+  transition:.18s background;
 }
+#search-btn:hover { background:#0b5ed7; }
+#search-btn:active { background:#094fad; }
 
-p {
-  margin-bottom: 1rem;
-  color: #666;
-  font-size: 0.9rem;
+.suggestion-wrapper {
+  position:relative;
 }
-
-input[type="text"],
-select {
-  width: 100%;
-  padding: 0.8rem;
-  margin-bottom: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+#acupoint-suggestion-list {
+  list-style:none;
+  margin:4px 0 0;
+  padding:0;
+  max-height:320px;
+  overflow-y:auto;
+  border:1px solid #cbd3da;
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 10px 22px -10px rgba(0,0,0,.25);
 }
-
-button,
-.back-to-main-btn {
-  display: inline-block;
-  padding: 0.8rem 1.5rem;
-  background-color: #4a90e2;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s;
+#acupoint-suggestion-list.hidden {
+  display:none;
 }
-
-button:hover,
-.back-to-main-btn:hover {
-  background-color: #357abd;
+#acupoint-suggestion-list li {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 14px 8px;
+  cursor:pointer;
+  font-size:.92rem;
+  line-height:1.3;
 }
-
-/* 結果画面共通 */
-.hidden {
-  display: none;
+#acupoint-suggestion-list li:nth-child(odd){
+  background:#fbfcfd;
 }
-
-.back-to-main-btn {
-  margin-bottom: 1.5rem;
-  background-color: #888;
+#acupoint-suggestion-list li:hover,
+#acupoint-suggestion-list li.active {
+  background:#0d6efd;
+  color:#fff;
 }
-
-.back-to-main-btn:hover {
-  background-color: #666;
+#acupoint-suggestion-list li .kana {
+  font-size:.65rem;
+  opacity:.75;
+  align-self:center;
+  white-space:nowrap;
 }
 
 .result-layout {
-  display: flex;
-  gap: 2rem;
+  display:flex;
+  gap:26px;
+  flex-wrap:wrap;
+  background:#fff;
+  border:1px solid #dde2e8;
+  padding:26px 26px 34px;
+  border-radius:18px;
+  box-shadow:0 6px 20px -8px rgba(0,0,0,.18);
 }
-
 .model-container {
-  flex: 1;
-  min-width: 300px;
+  flex:1 1 260px;
+  min-width:240px;
 }
-
 .info-container {
-  flex: 1.5;
-  background: #fff;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  flex:2 1 420px;
+  min-width:320px;
 }
-
 .placeholder {
-  width: 100%;
-  height: 400px;
-  background-color: #e0e0e0;
-  border: 2px dashed #ccc;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  color: #888;
-  border-radius: 8px;
+  background:repeating-linear-gradient(
+      45deg,#f1f4f8,#f1f4f8 10px,#e4e9ef 10px,#e4e9ef 20px);
+  border:1px solid #cfd6dd;
+  height:220px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-size:.85rem;
+  color:#555;
+  padding:10px;
 }
 
-#symptom-result-title {
-  margin-bottom: 1.5rem;
-}
-
-/* 詳細画面 */
 #result-name {
-  margin-bottom: 1.5rem;
+  margin:0 0 14px;
+  font-size:1.4rem;
+  letter-spacing:.06em;
+  color:#0d47a1;
+  font-weight:600;
 }
 
 .info-container h3 {
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-  color: #357abd;
-  border-bottom: 2px solid #e0e0e0;
-  padding-bottom: 0.3rem;
+  margin:22px 0 5px;
+  font-size:.9rem;
+  font-weight:700;
+  letter-spacing:.12em;
+  color:#444;
+  text-transform:uppercase;
+}
+.info-container p, .info-container ul {
+  margin:0;
+  font-size:.95rem;
+  line-height:1.55;
+  word-break:break-word;
+  white-space:pre-wrap;
+}
+.info-container ul { padding-left:18px; }
+
+.back-to-main-btn {
+  margin:0 0 18px;
+  background:#e9ecef;
+  border:1px solid #d0d5da;
+  color:#333;
+  border-radius:8px;
+  padding:8px 16px;
+  font-size:.85rem;
+  cursor:pointer;
+  font-weight:600;
+  letter-spacing:.05em;
+  transition:.15s background;
+}
+.back-to-main-btn:hover { background:#dfe3e6; }
+
+.bui-red, .bui-red * {
+  color:#d60000 !important;
+  font-weight:600;
 }
 
-.info-container ul {
-  list-style-position: inside;
-  padding-left: 1rem;
+@media (max-width:840px){
+  .result-layout { flex-direction:column; }
+  #result-name { font-size:1.25rem; }
 }
-
-.info-container ul li {
-  margin-bottom: 0.5rem;
-}
-
-/* 症状別一覧 */
-#symptom-acupoints-list a {
-  color: #4a90e2;
-  text-decoration: none;
-}
-
-#symptom-acupoints-list a:hover {
-  text-decoration: underline;
-}
-
-/* サジェスト */
-.suggestion-wrapper {
-  position: relative;
-}
-
-#acupoint-suggestion-list {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-top: none;
-  max-height: 220px;
-  overflow-y: auto;
-  list-style: none;
-  z-index: 20;
-  padding: 4px 0;
-}
-
-#acupoint-suggestion-list li {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 10px;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-#acupoint-suggestion-list li.active,
-#acupoint-suggestion-list li:hover {
-  background-color: #f0f6ff;
-}
-
-#acupoint-suggestion-list li .kana {
-  color: #888;
-  margin-left: 1rem;
-  font-size: 0.75rem;
+@media (max-width:520px){
+  header h1 { font-size:1.15rem; }
+  .search-container, .selection-container { padding:18px 18px 22px; }
+  #result-name { font-size:1.15rem; }
+  .info-container h3 { font-size:.8rem; }
 }
