@@ -25,11 +25,13 @@ section { margin-bottom:40px; }
   margin-bottom:26px;
   box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
 }
+
 .search-container h2, .selection-container h2 {
   margin:0 0 8px;
   font-size:1.15rem;
   letter-spacing:.05em;
 }
+
 .search-container input {
   width:100%;
   font-size:1rem;
@@ -43,6 +45,7 @@ section { margin-bottom:40px; }
   border-color:#0d6efd;
   box-shadow:0 0 0 3px rgba(13,110,253,.2);
 }
+
 #search-btn {
   margin-top:10px;
   padding:10px 22px;
@@ -53,7 +56,7 @@ section { margin-bottom:40px; }
   border-radius:8px;
   cursor:pointer;
   letter-spacing:.05em;
-  box-shadow:0 3px 10px -4px rgba(13,110,253,.4);
+  box-shadow:0 3px 10px -4px rgba(0,0,0,.4);
   transition:.18s background;
 }
 #search-btn:hover { background:#0b5ed7; }
@@ -64,7 +67,7 @@ section { margin-bottom:40px; }
   list-style:none;
   margin:4px 0 0;
   padding:0;
-  max-height:320px;
+  max-height:360px;
   overflow-y:auto;
   border:1px solid #cbd3da;
   background:#fff;
