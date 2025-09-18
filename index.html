@@ -5,6 +5,7 @@
   <title>経穴検索デモ</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="style.css">
+  <meta http-equiv="Cache-Control" content="no-store">
 </head>
 <body>
 <header>
@@ -12,7 +13,7 @@
 </header>
 
 <main>
-  <!-- 1. メイン画面 -->
+  <!-- メイン画面 -->
   <section id="main-screen">
     <div class="search-container">
       <h2>経穴検索</h2>
@@ -20,7 +21,7 @@
       <input
         type="text"
         id="acupoint-search-input"
-        placeholder="例: 百会 / ひゃくえ / 合谷 / さんいんこう"
+        placeholder="例: 百会 / ひゃくえ / 合谷 / あしさんり"
         autocomplete="off"
         aria-autocomplete="list"
         aria-haspopup="listbox"
@@ -31,15 +32,16 @@
         <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
       </div>
       <button id="search-btn" type="button">検索</button>
-      <p style="font-size:0.7rem;color:#666;margin-top:4px;">
-        ※経穴名内部のすべての空白は自動除去 / ひらがなは前方一致・漢字は部分一致
+      <p class="note-small">
+        ※内部で経穴名のすべての空白（全角/半角/NBSP）を除去して検索。
+        ひらがなは前方一致 → 0件時は部分一致 fallback / 漢字は部分一致。
       </p>
-      <p id="data-load-status" style="font-size:0.7rem;color:#888;margin-top:2px;">CSV 読み込み中...</p>
+      <p id="data-load-status" class="note-status">CSV 読み込み中...</p>
     </div>
 
     <div class="selection-container">
-      <h2>症状・病床から選択</h2>
-      <p>症状や病床を選択してください（デモ）</p>
+      <h2>症状・病床から選択（デモ）</h2>
+      <p>選択すると関連経穴を表示します。</p>
       <select id="symptom-select">
         <option value="">-- 選択してください --</option>
         <option value="symptom_demo1">デモ症状: 頭痛</option>
@@ -48,12 +50,14 @@
     </div>
   </section>
 
-  <!-- 2. 経穴詳細画面 -->
+  <!-- 経穴詳細画面 -->
   <section id="acupoint-result-screen" class="hidden">
     <button class="back-to-main-btn" type="button">← メイン画面に戻る</button>
     <div class="result-layout">
       <div class="model-container">
-        <div class="placeholder"><p>ここに3Dモデル（単一経穴）</p></div>
+        <div class="placeholder">
+          <p>ここに3Dモデル（単一経穴）</p>
+        </div>
       </div>
       <div class="info-container">
         <h2 id="result-name">（経穴名）</h2>
@@ -61,7 +65,7 @@
         <h3>経絡</h3>
         <p id="result-meridian">（経絡未登録）</p>
 
-        <!-- “経穴” 項目は非表示 -->
+        <!-- “経穴”見出しは仕様により非表示 -->
 
         <h3>部位</h3>
         <p id="result-region">（部位未登録）</p>
@@ -77,20 +81,22 @@
     </div>
   </section>
 
-  <!-- 3. 症状別経穴一覧画面 -->
+  <!-- 症状別経穴一覧画面 -->
   <section id="symptom-result-screen" class="hidden">
     <button class="back-to-main-btn" type="button">← メイン画面に戻る</button>
     <h2 id="symptom-result-title">デモ症状: 頭痛</h2>
     <div class="result-layout">
       <div class="model-container">
-        <div class="placeholder"><p>ここに3Dモデル（複数経穴）</p></div>
+        <div class="placeholder">
+          <p>ここに3Dモデル（複数経穴）</p>
+        </div>
       </div>
       <div class="info-container">
         <h3>関連する経穴一覧</h3>
         <ul id="symptom-acupoints-list">
           <li>（関連経穴なし）</li>
         </ul>
-        <p style="font-size:0.75rem;color:#666;">※クリックで詳細へ遷移</p>
+        <p class="note-small">※クリックで詳細へ遷移</p>
       </div>
     </div>
   </section>
