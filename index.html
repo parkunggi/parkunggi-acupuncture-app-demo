@@ -14,7 +14,7 @@
 
 <main>
   <section id="main-screen">
-    <!-- 経穴検索セクション（既存機能そのまま） -->
+    <!-- 経穴検索セクション -->
     <div class="search-container">
       <h2>経穴検索</h2>
       <p>経穴名（漢字 / ひらがな）または筋肉名（漢字）を入力してください（1文字以上で候補表示）</p>
@@ -38,7 +38,7 @@
       <p id="data-load-status" class="note-status">CSV 読み込み中...</p>
     </div>
 
-    <!-- 症状・病証 選択（東洋臨床論対応 2段ドロップダウン） -->
+    <!-- 症状・病証 選択 -->
     <div class="selection-container">
       <h2>症状・病証から選択（東洋臨床論）</h2>
       <p class="note-small">
@@ -65,7 +65,7 @@
       <div id="clinical-treatment-groups"></div>
     </div>
 
-    <!-- 経穴詳細（インライン） -->
+    <!-- 経穴詳細 -->
     <div id="inline-acupoint-result" class="result-layout hidden" aria-live="polite">
       <div class="model-container">
         <div class="placeholder">
@@ -82,14 +82,14 @@
         <p id="result-region">（部位未登録）</p>
 
         <h3>要穴</h3>
-        <p id="result-important">（要穴未登録）</p>
+        <p id="result-important">-</p>
 
         <h3>筋肉</h3>
         <p id="result-muscle">（筋肉未登録）</p>
 
-        <h3>関連する症状（デモ）</h3>
+        <h3>病証名</h3>
         <ul id="related-symptoms">
-          <li>（関連症状未登録）</li>
+          <li>（関連病証なし）</li>
         </ul>
       </div>
     </div>
@@ -97,9 +97,8 @@
   </section>
 </main>
 
-<!-- 辞書 & 本体スクリプト（readings.js / muscle-map.js は既存のまま） -->
 <script src="readings.js?v=20250918-14"></script>
 <script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-14"></script>
+<script src="app.js?v=20250918-24"></script>
 </body>
 </html>
