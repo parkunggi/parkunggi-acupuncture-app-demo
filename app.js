@@ -1,14 +1,14 @@
 /******************************************************
- * 経穴検索 + 臨床病証二段選択 拡張版 (治療方針表示 + 経穴リンク化強化)
- * - APP_VERSION 20250918-17
- * - 追加:
- *   1) 治療方針(治法)内 経穴クリックで既存詳細エリアを上書き表示
- *   2) 記号分割（＋・※ など）/ 全角半角スラッシュ統一
- *   3) 未登録経穴もクリック可（未登録表示）
- *   4) 要穴(important列あり) 経穴は常時赤字表示
+ * 経穴検索 + 臨床病証二段選択 拡張版
+ * - APP_VERSION 20250918-19
+ * - 変更概要:
+ *   * 臨床CSV(東洋臨床論.csv) を「横展開（列＝病証パターン）」形式で正しく解析
+ *   * "治療方針(治法)" 行 + コメント行ペアから治療グループ抽出
+ *   * "病証名" がカテゴリになる不具合修正
+ *   * 既存: 経穴クリック = 詳細上書き / 要穴赤字強調 / 未登録クリック可
  ******************************************************/
 
-const APP_VERSION = '20250918-17';
+const APP_VERSION = '20250918-19';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -29,14 +29,13 @@ let DATA_READY = false;
 /*
  CLINICAL_DATA 構造:
  {
-   order: [cat1, cat2, ...],
+   order: [category1, ...],
    cats: {
      "1.眼精疲労": {
        patternOrder: ["【肝血虚】→眼精疲労", ...],
        patterns: {
          "【肝血虚】→眼精疲労": [
-           { label:"疏通経絡", rawPoints:"足三里/...", points:[...], comment:"..." },
-           ...
+           { label:"疏通経絡", rawPoints:"晴明/魚腰/...", comment:"(～～)", ... }
          ]
        }
      }
@@ -82,7 +81,7 @@ function applyRedMarkup(text){
   return text.replace(/\[\[(.+?)\]\]/g,'<span class="bui-red">$1</span>');
 }
 function tokenizePoints(raw){
-  // 旧: 基本スラッシュ分割
+  // 旧互換（未使用箇所残存）
   return raw
     .replace(/[，、]/g,'/')
     .replace(/／/g,'/')
@@ -93,15 +92,11 @@ function tokenizePoints(raw){
 }
 function ensureCommentParens(c){
   if(!c) return '';
-  if(/^\s*[（(]/.test(c)) return c; // 既に括弧あり
+  if(/^\s*[（(]/.test(c)) return c;
   return '(' + c + ')';
 }
 
-/* ==== 新: 治療方針内 経穴トークン化 ==== */
-/**
- * 記号・区切り（/ ／ ＋ + ・ ･ ※ 句読点 空白 改行）を統一し、空要素除去。
- * 末尾のスラッシュは表示側で付与するためここでは除去。
- */
+/* ==== 治療方針内 経穴トークン化 ==== */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   return raw
@@ -109,7 +104,6 @@ function parseTreatmentPoints(raw){
     .replace(/[，、]/g,'/')
     .replace(/[＋+※･・]/g,'/')
     .replace(/／/g,'/')
-    // 連続スラッシュ圧縮
     .replace(/\/{2,}/g,'/')
     .split('/')
     .map(t=>removeAllUnicodeSpaces(t))
@@ -118,14 +112,9 @@ function parseTreatmentPoints(raw){
     .map(t=>t.replace(/[。.,、，;；/]+$/,''))
     .filter(Boolean);
 }
-
-/**
- * 経穴名ルックアップ用正規化
- */
 function normalizeAcuLookupName(name){
   return removeAllUnicodeSpaces(name || '').trim();
 }
-
 function findAcupointByToken(token){
   const key = normalizeAcuLookupName(token);
   if(!key) return null;
@@ -172,94 +161,173 @@ function parseAcuCSV(text){
   return out;
 }
 
-/* ==== 臨床 CSV ==== */
-function detectDelimiter(sampleText){
-  let commaCount=0, tabCount=0;
-  sampleText.split(/\r?\n/).slice(0,10).forEach(l=>{
-    if(l.includes('\t')) tabCount++;
-    if(l.includes(',')) commaCount++;
+/* ==== 臨床 CSV: 横持ち行列パーサ ==== */
+
+/**
+ * 前処理:
+ *  1) "治療方針<改行>(治法)" を "治療方針(治法)" に潰す
+ *  2) CRLF 正規化
+ */
+function preprocessClinicalCSV(raw){
+  return raw
+    .replace(/"治療方針\s*\r?\n\s*\(治法\)\s*"/g,'"治療方針(治法)"')
+    .replace(/\r\n/g,'\n');
+}
+
+/**
+ * CSV 行をラフに分割（カンマのみ。内部で追加の引用崩壊は少ない想定）
+ * 末尾空要素も保持するため split(/,(?=...)/) のような高度処理は省略。
+ */
+function toRows(text){
+  return text.split(/\n/).map(line=>{
+    if(!line.trim()) return [];
+    // 引用符除去（単純）
+    return line.split(',').map(c=>c.replace(/^"+|"+$/g,'').trim());
   });
-  return tabCount>commaCount ? '\t' : ',';
 }
-function splitCSVLine(line, delimiter){
-  if(delimiter === '\t') return line.split('\t');
-  return line.split(delimiter);
+
+function isCategoryCell(cell){
+  if(!cell) return false;
+  const c = removeAllUnicodeSpaces(cell);
+  return /^[0-9０-９][0-9０-９-]*\./.test(c);
 }
-function parseClinicalCSV(text){
-  const delimiter = detectDelimiter(text);
-  const lines = text.split(/\r?\n/);
+function isPatternHeaderCell(cell){
+  if(!cell) return false;
+  const t = cell.replace(/\s+/g,'');
+  return /病証名/.test(t);
+}
+function isTreatmentHeaderRowFirstCell(cell){
+  if(!cell) return false;
+  return /治療方針/.test(cell);
+}
+function isLikelyCommentCell(cell){
+  if(!cell) return false;
+  return /^[（(]/.test(cell.trim());
+}
+
+/**
+ * “ラベル：ポイント列” を label / rawPoints に分離
+ */
+function splitLabelAndPoints(cell){
+  if(!cell) return {label:'', rawPoints:''};
+  const idx = cell.indexOf('：'); // 全角
+  const idx2 = cell.indexOf(':'); // 念のため半角
+  let use = -1;
+  if(idx >=0 && idx2 >=0) use = Math.min(idx, idx2);
+  else use = idx >=0 ? idx : idx2;
+  if(use<0){
+    return {label: cell.trim(), rawPoints:''};
+  }
+  return {
+    label: cell.slice(0,use).trim(),
+    rawPoints: cell.slice(use+1).trim()
+  };
+}
+
+function parseClinicalCSV(rawText){
+  const text = preprocessClinicalCSV(rawText);
+  const rows = toRows(text)
+    .map(cols => cols.map(c => c.replace(/\uFEFF/g,'').replace(/\u00A0/g,' ').trim()));
+
   const data = { order: [], cats: {} };
-  let headerSeen = false;
+  let i=0;
 
-  for(const rawLine of lines){
-    if(!rawLine) continue;
-    let raw = rawLine.replace(/\uFEFF/g,'').trim();
-    if(!raw) continue;
+  while(i < rows.length){
+    const row = rows[i];
+    if(!row.length){ i++; continue; }
 
-    raw = raw.replace(/^"+|"+$/g,'');
-    const cols = splitCSVLine(raw, delimiter).map(c=>c.replace(/^"+|"+$/g,'').trim());
+    if(isCategoryCell(row[0])){
+      // 新カテゴリ
+      const category = removeAllUnicodeSpaces(row[0]);
+      if(!data.cats[category]){
+        data.cats[category] = { patternOrder: [], patterns: {} };
+        data.order.push(category);
+      }
 
-    if(!headerSeen){
-      const lower = cols.map(c=>c.toLowerCase());
-      if(lower.some(c=>c.includes('category') || c.includes('pattern') || c.includes('grouplabel'))){
-        headerSeen = true;
+      // 次行: 病証名 行
+      let patternRow = rows[i+1] || [];
+      if(!patternRow.length || !isPatternHeaderCell(patternRow[0])){
+        // 病証名行が無ければカテゴリだけ進めて終了
+        i++;
         continue;
       }
-      // ヘッダが無い場合でも一度だけフラグ
-      headerSeen = true;
-    }
-
-    let categoryCombined='', pattern='', groupLabel='', pointsRaw='', comment='';
-
-    // 形式B（番号,タイトル,...）
-    if(cols.length >=6 && /^\d+$/.test(cols[0]) && cols[1] && cols[2]){
-      categoryCombined = `${cols[0]}.${cols[1]}`.replace(/\s+/g,'');
-      pattern    = cols[2];
-      groupLabel = cols[3];
-      pointsRaw  = cols[4];
-      comment    = cols[5] || '';
-    } else if(cols.length >=5){
-      // 形式A
-      categoryCombined = cols[0];
-      pattern    = cols[1];
-      groupLabel = cols[2];
-      pointsRaw  = cols[3];
-      comment    = cols[4] || '';
-      // 微調整 (数字単独列 + 5列ケース)
-      if(/^\d+$/.test(cols[0]) && !/\d+\./.test(cols[0]) && cols.length===5){
-        categoryCombined = `${cols[0]}.${cols[1]}`.replace(/\s+/g,'');
-        pattern    = cols[2];
-        groupLabel = cols[3];
-        pointsRaw  = cols[4];
-        comment    = cols[5] || '';
+      // 2列目以降がパターン名
+      const patternNames = [];
+      for(let c=1;c<patternRow.length;c++){
+        const name = trimOuter(patternRow[c]);
+        if(name){
+          patternNames.push({ index:c, name });
+          if(!data.cats[category].patterns[name]){
+            data.cats[category].patterns[name] = [];
+            data.cats[category].patternOrder.push(name);
+          }
+        }
       }
-    } else {
+      i += 2; // カテゴリ行 + 病証名行を消費
+
+      // 治療方針ブロックの収集
+      while(i < rows.length){
+        const r = rows[i];
+        if(!r.length){
+          i++; continue;
+        }
+        // 次カテゴリが始まったら抜ける
+        if(isCategoryCell(r[0])) break;
+
+        // 治療方針行でない: スキップ
+        if(!isTreatmentHeaderRowFirstCell(r[0])){
+          i++;
+          continue;
+        }
+
+        const groupRow = r;
+        const next = rows[i+1] || [];
+        let commentRow = null;
+
+        // コメント行判定（次行先頭が空 or 治療方針ではなく、列2以降が括弧始まり多数 or 最低1つ括弧）
+        const nextFirst = next[0]||'';
+        const nextLooksCategory = isCategoryCell(nextFirst);
+        if(!nextLooksCategory &&
+           !isTreatmentHeaderRowFirstCell(nextFirst) &&
+           (next.slice(1).some(c=>isLikelyCommentCell(c)) || isLikelyCommentCell(next[1]||''))){
+          commentRow = next;
+        }
+
+        // 各パターン列処理
+        for(const pInfo of patternNames){
+          const cell = groupRow[pInfo.index] || '';
+            // 空ならスキップ
+          if(!cell) continue;
+          const {label, rawPoints} = splitLabelAndPoints(cell);
+          if(!label && !rawPoints) continue;
+
+          let comment = '';
+          if(commentRow){
+            const cc = commentRow[pInfo.index] || '';
+            if(isLikelyCommentCell(cc)) comment = cc;
+          }
+
+            data.cats[category].patterns[pInfo.name].push({
+              label,
+              rawPoints,
+              comment: comment
+            });
+        }
+
+        i += commentRow ? 2 : 1;
+      }
       continue;
     }
 
-    categoryCombined = trimOuter(categoryCombined);
-    pattern          = trimOuter(pattern);
-    groupLabel       = trimOuter(groupLabel);
-    pointsRaw        = trimOuter(pointsRaw);
-    comment          = trimOuter(comment);
-
-    if(!categoryCombined || !pattern || !groupLabel || !pointsRaw) continue;
-
-    if(!data.cats[categoryCombined]){
-      data.cats[categoryCombined] = { patternOrder: [], patterns: {} };
-      data.order.push(categoryCombined);
-    }
-    if(!data.cats[categoryCombined].patterns[pattern]){
-      data.cats[categoryCombined].patterns[pattern] = [];
-      data.cats[categoryCombined].patternOrder.push(pattern);
-    }
-    data.cats[categoryCombined].patterns[pattern].push({
-      label: groupLabel,
-      rawPoints: pointsRaw,                      // 生文字列保持
-      points: tokenizePoints(pointsRaw),         // 旧フォーマット互換（必要なら）
-      comment
-    });
+    i++;
   }
+
+  // デバッグ出力
+  console.log('[ClinicalParser] Categories:', data.order);
+  if(data.order.length){
+    console.log('[ClinicalParser] First category patterns:', data.cats[data.order[0]].patternOrder);
+  }
+
   return data;
 }
 
@@ -357,7 +425,6 @@ function showPointDetail(p){
   inlineAcupointResult.classList.remove('hidden');
   inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
-
 function showUnknownPoint(name){
   resultNameEl.textContent      = `${name}（未登録）`;
   resultMeridianEl.textContent  = '（経絡未登録）';
@@ -368,7 +435,6 @@ function showUnknownPoint(name){
   inlineAcupointResult.classList.remove('hidden');
   inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
-
 function selectPoint(p){
   clearSuggestions();
   inputEl.value = p.name;
@@ -404,16 +470,15 @@ patternSelect.addEventListener('change', ()=>{
   groups.forEach(g=>{
     const div = document.createElement('div');
     div.className = 'treat-line';
-    const tokens = parseTreatmentPoints(g.rawPoints || (Array.isArray(g.points)? g.points.join('/') : g.points));
+    const tokens = parseTreatmentPoints(g.rawPoints);
     const pointsHtml = tokens.map(token=>{
       const acu = findAcupointByToken(token);
       if(acu){
         const importantClass = acu.important ? ' acu-important' : '';
         return `<a href="#" class="treat-point-link${importantClass}" data-point="${acu.name}">${acu.name}</a>`;
       }
-      // 未登録もクリック可能
       return `<a href="#" class="treat-point-link treat-point-unknown" data-point="${token}" data-unknown="1">${token}</a>`;
-    }).join('/') + '/'; // 最後にも '/'
+    }).join('/') + (tokens.length? '/' : '');
 
     const comment = g.comment ? ensureCommentParens(g.comment) : '';
     div.innerHTML = `
@@ -537,6 +602,7 @@ async function loadClinicalCSV(){
 
     clinicalStatusEl.textContent =
       `臨床CSV 読み込み完了: カテゴリ ${CLINICAL_DATA.order.length}件`;
+    console.log('[ClinicalParser] 完了', CLINICAL_DATA);
   }catch(err){
     console.error(err);
     clinicalStatusEl.textContent = '臨床CSV 読み込み失敗: '+err.message;
