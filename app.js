@@ -1,14 +1,13 @@
 /******************************************************
  * 経穴検索 + 臨床病証二段選択 拡張版
- * - APP_VERSION 20250918-19
- * - 変更概要:
- *   * 臨床CSV(東洋臨床論.csv) を「横展開（列＝病証パターン）」形式で正しく解析
- *   * "治療方針(治法)" 行 + コメント行ペアから治療グループ抽出
- *   * "病証名" がカテゴリになる不具合修正
- *   * 既存: 経穴クリック = 詳細上書き / 要穴赤字強調 / 未登録クリック可
+ * - APP_VERSION 20250918-20
+ * - 変更:
+ *   * 臨床CSVパーサ: 横インターリーブ形式 (治療/コメント/治療/コメント ...) に対応
+ *   * 12.のぼせ などで 2 病証目以降の治療方針が表示されない不具合修正
+ *   * 1番目病証のコメント "(陰分を補う)" が表示されない問題修正
  ******************************************************/
 
-const APP_VERSION = '20250918-19';
+const APP_VERSION = '20250918-20';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -26,22 +25,6 @@ const MUSCLE_MAP = window.ACU_MUSCLE_MAP || {};
 let ACUPOINTS = [];
 let DATA_READY = false;
 
-/*
- CLINICAL_DATA 構造:
- {
-   order: [category1, ...],
-   cats: {
-     "1.眼精疲労": {
-       patternOrder: ["【肝血虚】→眼精疲労", ...],
-       patterns: {
-         "【肝血虚】→眼精疲労": [
-           { label:"疏通経絡", rawPoints:"晴明/魚腰/...", comment:"(～～)", ... }
-         ]
-       }
-     }
-   }
- }
-*/
 let CLINICAL_DATA = { order: [], cats: {} };
 let CLINICAL_READY = false;
 
@@ -81,7 +64,6 @@ function applyRedMarkup(text){
   return text.replace(/\[\[(.+?)\]\]/g,'<span class="bui-red">$1</span>');
 }
 function tokenizePoints(raw){
-  // 旧互換（未使用箇所残存）
   return raw
     .replace(/[，、]/g,'/')
     .replace(/／/g,'/')
@@ -162,30 +144,17 @@ function parseAcuCSV(text){
 }
 
 /* ==== 臨床 CSV: 横持ち行列パーサ ==== */
-
-/**
- * 前処理:
- *  1) "治療方針<改行>(治法)" を "治療方針(治法)" に潰す
- *  2) CRLF 正規化
- */
 function preprocessClinicalCSV(raw){
   return raw
     .replace(/"治療方針\s*\r?\n\s*\(治法\)\s*"/g,'"治療方針(治法)"')
     .replace(/\r\n/g,'\n');
 }
-
-/**
- * CSV 行をラフに分割（カンマのみ。内部で追加の引用崩壊は少ない想定）
- * 末尾空要素も保持するため split(/,(?=...)/) のような高度処理は省略。
- */
 function toRows(text){
   return text.split(/\n/).map(line=>{
     if(!line.trim()) return [];
-    // 引用符除去（単純）
     return line.split(',').map(c=>c.replace(/^"+|"+$/g,'').trim());
   });
 }
-
 function isCategoryCell(cell){
   if(!cell) return false;
   const c = removeAllUnicodeSpaces(cell);
@@ -204,14 +173,10 @@ function isLikelyCommentCell(cell){
   if(!cell) return false;
   return /^[（(]/.test(cell.trim());
 }
-
-/**
- * “ラベル：ポイント列” を label / rawPoints に分離
- */
 function splitLabelAndPoints(cell){
   if(!cell) return {label:'', rawPoints:''};
-  const idx = cell.indexOf('：'); // 全角
-  const idx2 = cell.indexOf(':'); // 念のため半角
+  const idx = cell.indexOf('：');
+  const idx2 = cell.indexOf(':');
   let use = -1;
   if(idx >=0 && idx2 >=0) use = Math.min(idx, idx2);
   else use = idx >=0 ? idx : idx2;
@@ -237,21 +202,17 @@ function parseClinicalCSV(rawText){
     if(!row.length){ i++; continue; }
 
     if(isCategoryCell(row[0])){
-      // 新カテゴリ
       const category = removeAllUnicodeSpaces(row[0]);
       if(!data.cats[category]){
         data.cats[category] = { patternOrder: [], patterns: {} };
         data.order.push(category);
       }
 
-      // 次行: 病証名 行
       let patternRow = rows[i+1] || [];
       if(!patternRow.length || !isPatternHeaderCell(patternRow[0])){
-        // 病証名行が無ければカテゴリだけ進めて終了
         i++;
         continue;
       }
-      // 2列目以降がパターン名
       const patternNames = [];
       for(let c=1;c<patternRow.length;c++){
         const name = trimOuter(patternRow[c]);
@@ -263,28 +224,55 @@ function parseClinicalCSV(rawText){
           }
         }
       }
-      i += 2; // カテゴリ行 + 病証名行を消費
+      i += 2;
 
-      // 治療方針ブロックの収集
       while(i < rows.length){
         const r = rows[i];
-        if(!r.length){
-          i++; continue;
-        }
-        // 次カテゴリが始まったら抜ける
+        if(!r.length){ i++; continue; }
         if(isCategoryCell(r[0])) break;
-
-        // 治療方針行でない: スキップ
         if(!isTreatmentHeaderRowFirstCell(r[0])){
           i++;
           continue;
         }
 
         const groupRow = r;
+        const interleaved = groupRow.slice(1).some(c=>isLikelyCommentCell(c));
+
+        if(interleaved){
+          // 横インターリーブ： [治療, (コメ), 治療, (コメ), ...]
+            const after = groupRow.slice(1);
+          let ptr = 0;
+          for(let p=0; p<patternNames.length; p++){
+            // スキップ空
+            while(ptr<after.length && !after[ptr]) ptr++;
+            if(ptr>=after.length) break;
+            const treatCell = after[ptr];
+            if(!treatCell){
+              ptr++;
+              continue;
+            }
+            ptr++;
+            let commentCell = '';
+            if(ptr<after.length && isLikelyCommentCell(after[ptr])){
+              commentCell = after[ptr];
+              ptr++;
+            }
+            if(!treatCell || isLikelyCommentCell(treatCell)) continue;
+            const {label, rawPoints} = splitLabelAndPoints(treatCell);
+            if(!label && !rawPoints) continue;
+            data.cats[category].patterns[patternNames[p].name].push({
+              label,
+              rawPoints,
+              comment: commentCell
+            });
+          }
+          i++; // コメント行は存在しない（同一行内）
+          continue;
+        }
+
+        // 従来形式: 次行がコメント行
         const next = rows[i+1] || [];
         let commentRow = null;
-
-        // コメント行判定（次行先頭が空 or 治療方針ではなく、列2以降が括弧始まり多数 or 最低1つ括弧）
         const nextFirst = next[0]||'';
         const nextLooksCategory = isCategoryCell(nextFirst);
         if(!nextLooksCategory &&
@@ -293,41 +281,33 @@ function parseClinicalCSV(rawText){
           commentRow = next;
         }
 
-        // 各パターン列処理
         for(const pInfo of patternNames){
           const cell = groupRow[pInfo.index] || '';
-            // 空ならスキップ
           if(!cell) continue;
           const {label, rawPoints} = splitLabelAndPoints(cell);
           if(!label && !rawPoints) continue;
-
           let comment = '';
           if(commentRow){
             const cc = commentRow[pInfo.index] || '';
             if(isLikelyCommentCell(cc)) comment = cc;
           }
-
-            data.cats[category].patterns[pInfo.name].push({
-              label,
-              rawPoints,
-              comment: comment
-            });
+          data.cats[category].patterns[pInfo.name].push({
+            label,
+            rawPoints,
+            comment
+          });
         }
-
         i += commentRow ? 2 : 1;
       }
       continue;
     }
-
     i++;
   }
 
-  // デバッグ出力
   console.log('[ClinicalParser] Categories:', data.order);
   if(data.order.length){
     console.log('[ClinicalParser] First category patterns:', data.cats[data.order[0]].patternOrder);
   }
-
   return data;
 }
 
