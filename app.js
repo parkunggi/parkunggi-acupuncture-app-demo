@@ -1,10 +1,14 @@
 /******************************************************
- * 経穴検索 + 臨床病証二段選択 拡張版 (治療方針表示形式調整)
- * - APP_VERSION 20250918-16
- * - 治療方針(治法)の表示を「ラベル：経穴/…/」+ 次行コメント(括弧)形式へ変更
+ * 経穴検索 + 臨床病証二段選択 拡張版 (治療方針表示 + 経穴リンク化強化)
+ * - APP_VERSION 20250918-17
+ * - 追加:
+ *   1) 治療方針(治法)内 経穴クリックで既存詳細エリアを上書き表示
+ *   2) 記号分割（＋・※ など）/ 全角半角スラッシュ統一
+ *   3) 未登録経穴もクリック可（未登録表示）
+ *   4) 要穴(important列あり) 経穴は常時赤字表示
  ******************************************************/
 
-const APP_VERSION = '20250918-16';
+const APP_VERSION = '20250918-17';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -31,7 +35,7 @@ let DATA_READY = false;
        patternOrder: ["【肝血虚】→眼精疲労", ...],
        patterns: {
          "【肝血虚】→眼精疲労": [
-           { label:"疏通経絡", points:[...], comment:"..." },
+           { label:"疏通経絡", rawPoints:"足三里/...", points:[...], comment:"..." },
            ...
          ]
        }
@@ -78,6 +82,7 @@ function applyRedMarkup(text){
   return text.replace(/\[\[(.+?)\]\]/g,'<span class="bui-red">$1</span>');
 }
 function tokenizePoints(raw){
+  // 旧: 基本スラッシュ分割
   return raw
     .replace(/[，、]/g,'/')
     .replace(/／/g,'/')
@@ -90,6 +95,41 @@ function ensureCommentParens(c){
   if(!c) return '';
   if(/^\s*[（(]/.test(c)) return c; // 既に括弧あり
   return '(' + c + ')';
+}
+
+/* ==== 新: 治療方針内 経穴トークン化 ==== */
+/**
+ * 記号・区切り（/ ／ ＋ + ・ ･ ※ 句読点 空白 改行）を統一し、空要素除去。
+ * 末尾のスラッシュは表示側で付与するためここでは除去。
+ */
+function parseTreatmentPoints(raw){
+  if(!raw) return [];
+  return raw
+    .replace(/\r?\n/g,'/')
+    .replace(/[，、]/g,'/')
+    .replace(/[＋+※･・]/g,'/')
+    .replace(/／/g,'/')
+    // 連続スラッシュ圧縮
+    .replace(/\/{2,}/g,'/')
+    .split('/')
+    .map(t=>removeAllUnicodeSpaces(t))
+    .map(t=>t.trim())
+    .filter(t=>t.length)
+    .map(t=>t.replace(/[。.,、，;；/]+$/,''))
+    .filter(Boolean);
+}
+
+/**
+ * 経穴名ルックアップ用正規化
+ */
+function normalizeAcuLookupName(name){
+  return removeAllUnicodeSpaces(name || '').trim();
+}
+
+function findAcupointByToken(token){
+  const key = normalizeAcuLookupName(token);
+  if(!key) return null;
+  return ACUPOINTS.find(p=>p.name === key);
 }
 
 /* ==== 経穴 CSV パース ==== */
@@ -165,7 +205,7 @@ function parseClinicalCSV(text){
         headerSeen = true;
         continue;
       }
-      // ヘッダが無い場合は headerSeen フラグだけ立てて継続
+      // ヘッダが無い場合でも一度だけフラグ
       headerSeen = true;
     }
 
@@ -215,7 +255,8 @@ function parseClinicalCSV(text){
     }
     data.cats[categoryCombined].patterns[pattern].push({
       label: groupLabel,
-      points: tokenizePoints(pointsRaw),
+      rawPoints: pointsRaw,                      // 生文字列保持
+      points: tokenizePoints(pointsRaw),         // 旧フォーマット互換（必要なら）
       comment
     });
   }
@@ -316,6 +357,18 @@ function showPointDetail(p){
   inlineAcupointResult.classList.remove('hidden');
   inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
+
+function showUnknownPoint(name){
+  resultNameEl.textContent      = `${name}（未登録）`;
+  resultMeridianEl.textContent  = '（経絡未登録）';
+  resultRegionEl.innerHTML      = '（部位未登録）';
+  resultImportantEl.textContent = '（要穴未登録）';
+  resultMuscleEl.textContent    = '（筋肉未登録）';
+  relatedSymptomsEl.innerHTML   = '<li>（関連症状未登録）</li>';
+  inlineAcupointResult.classList.remove('hidden');
+  inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
 function selectPoint(p){
   clearSuggestions();
   inputEl.value = p.name;
@@ -351,12 +404,17 @@ patternSelect.addEventListener('change', ()=>{
   groups.forEach(g=>{
     const div = document.createElement('div');
     div.className = 'treat-line';
-    const pointsHtml = g.points.map(pt=>{
-      const acu = ACUPOINTS.find(a=>a.name===pt);
-      return acu
-        ? `<a href="#" class="treat-point-link" data-point="${acu.name}">${acu.name}</a>`
-        : `<span class="treat-point-miss">${pt}</span>`;
+    const tokens = parseTreatmentPoints(g.rawPoints || (Array.isArray(g.points)? g.points.join('/') : g.points));
+    const pointsHtml = tokens.map(token=>{
+      const acu = findAcupointByToken(token);
+      if(acu){
+        const importantClass = acu.important ? ' acu-important' : '';
+        return `<a href="#" class="treat-point-link${importantClass}" data-point="${acu.name}">${acu.name}</a>`;
+      }
+      // 未登録もクリック可能
+      return `<a href="#" class="treat-point-link treat-point-unknown" data-point="${token}" data-unknown="1">${token}</a>`;
     }).join('/') + '/'; // 最後にも '/'
+
     const comment = g.comment ? ensureCommentParens(g.comment) : '';
     div.innerHTML = `
       <p class="treat-main">${g.label}：${pointsHtml}</p>
@@ -372,8 +430,12 @@ patternSelect.addEventListener('change', ()=>{
     a.addEventListener('click', e=>{
       e.preventDefault();
       const name = a.dataset.point;
-      const p = ACUPOINTS.find(x=>x.name===name);
-      if(p) showPointDetail(p);
+      const p = findAcupointByToken(name);
+      if(p){
+        showPointDetail(p);
+      } else {
+        showUnknownPoint(name);
+      }
     });
   });
 });
@@ -531,10 +593,28 @@ function injectDynamicCSS(){
     color:#004c99;
     text-decoration:none;
     border-bottom:1px dotted #004c99;
+    padding:0 2px;
   }
   .treat-main a:hover{
     color:#c03;
     border-bottom-color:#c03;
+  }
+  .treat-main a.acu-important{
+    color:#c40000;
+    border-bottom-color:#c40000;
+    font-weight:700;
+  }
+  .treat-main a.acu-important:hover{
+    color:#ff2a2a;
+    border-bottom-color:#ff2a2a;
+  }
+  .treat-point-unknown{
+    color:#555;
+    border-bottom-color:#999;
+  }
+  .treat-point-unknown:hover{
+    color:#222;
+    border-bottom-color:#666;
   }
   .treat-comment{
     margin:0 0 .4rem;
