@@ -14,6 +14,7 @@
 
 <main>
   <section id="main-screen">
+    <!-- 経穴検索セクション（既存機能そのまま） -->
     <div class="search-container">
       <h2>経穴検索</h2>
       <p>経穴名（漢字 / ひらがな）または筋肉名（漢字）を入力してください（1文字以上で候補表示）</p>
@@ -37,14 +38,31 @@
       <p id="data-load-status" class="note-status">CSV 読み込み中...</p>
     </div>
 
+    <!-- 症状・病証 選択（東洋臨床論対応 2段ドロップダウン） -->
     <div class="selection-container">
-      <h2>症状・病床から選択（デモ）</h2>
-      <p>選択すると関連経穴が下部に表示されます。</p>
-      <select id="symptom-select">
-        <option value="">-- 選択してください --</option>
-        <option value="symptom_demo1">デモ症状: 頭痛</option>
-        <option value="symptom_demo2">デモ症状: 首肩こり</option>
-      </select>
+      <h2>症状・病証から選択（東洋臨床論）</h2>
+      <p class="note-small">
+        1.「症状カテゴリ」→ 2.「病証名」を選択すると治療方針(治法)が表示され、経穴クリックで下部詳細が更新されます。
+      </p>
+      <div class="clinical-select-group">
+        <label for="clinical-category-select">1. 症状カテゴリ</label>
+        <select id="clinical-category-select">
+          <option value="">-- カテゴリを選択 --</option>
+        </select>
+      </div>
+      <div class="clinical-select-group">
+        <label for="clinical-pattern-select">2. 病証名</label>
+        <select id="clinical-pattern-select" disabled>
+          <option value="">-- 病証を選択 --</option>
+        </select>
+      </div>
+      <p id="clinical-load-status" class="note-status">臨床CSV 読み込み中...</p>
+    </div>
+
+    <!-- 治療方針表示領域 -->
+    <div id="clinical-treatment-result" class="clinical-result hidden" aria-live="polite">
+      <h2 id="clinical-selected-title">（治療方針）</h2>
+      <div id="clinical-treatment-groups"></div>
     </div>
 
     <!-- 経穴詳細（インライン） -->
@@ -76,29 +94,12 @@
       </div>
     </div>
 
-    <!-- 症状→関連経穴一覧（インライン） -->
-    <div id="inline-symptom-result" class="result-layout hidden" aria-live="polite">
-      <div class="model-container">
-        <div class="placeholder">
-          <p>ここに3Dモデル（複数経穴）</p>
-        </div>
-      </div>
-      <div class="info-container">
-        <h2 id="symptom-result-title">（症状名）</h2>
-        <h3>関連する経穴一覧</h3>
-        <ul id="symptom-acupoints-list">
-          <li>（関連経穴なし）</li>
-        </ul>
-        <p class="note-small">※クリックで上の「経穴詳細」パネルを更新</p>
-      </div>
-    </div>
-
   </section>
 </main>
 
-<!-- データ辞書（順番重要: readings.js → muscle-map.js → app.js） -->
-<script src="readings.js?v=20250918-12"></script>
-<script src="muscle-map.js?v=20250918-12"></script>
-<script src="app.js?v=20250918-12"></script>
+<!-- 辞書 & 本体スクリプト（readings.js / muscle-map.js は既存のまま） -->
+<script src="readings.js?v=20250918-14"></script>
+<script src="muscle-map.js?v=20250918-14"></script>
+<script src="app.js?v=20250918-14"></script>
 </body>
 </html>
