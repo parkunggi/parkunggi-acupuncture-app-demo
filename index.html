@@ -288,6 +288,7 @@
     #acupoint-suggestion-list li {
       grid-template-columns:auto 8px 1fr auto;
     }
+    /* モバイルでは高さ揃えを解除するため inline height を JS が外す */
   }
 </style>
 </head>
@@ -296,7 +297,7 @@
 <main>
   <section id="main-screen">
     <div class="left-inner">
-      <div class="search-container">
+      <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
         <input
           id="acupoint-search-input"
@@ -313,7 +314,7 @@
         <button id="search-btn" type="button">検索</button>
       </div>
 
-      <div class="selection-container">
+      <div id="symptom-card" class="selection-container">
         <h2>症状・病証</h2>
         <div style="margin-bottom:6px;">
           <label for="clinical-category-select" style="display:block;font-size:.7rem;margin:0 0 3px;">カテゴリ</label>
@@ -352,6 +353,6 @@
 
 <script src="readings.js?v=20250918-14"></script>
 <script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-32"></script>
+<script src="app.js?v=20250918-33"></script>
 </body>
 </html>
