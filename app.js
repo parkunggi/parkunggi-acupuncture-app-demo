@@ -1,14 +1,11 @@
 /******************************************************
  * 経穴検索 + 臨床病証二段選択 拡張版
- * - APP_VERSION 20250918-27
- * 変更:
- *  1) buildPointsHTML: 最長一致 + 括弧グループ分離。括弧(...) / （...）はリンク化せず保持
- *  2) parseTreatmentPoints: 括弧内コメント除去後トークン化（索引用）
- *  3) レイアウト最小化 (index.html対応) に追随
- *  4) 病証名なし表示を "-" に変更
+ * - APP_VERSION 20250918-28
+ * - 変更点: レイアウト入替 (症状・病証 → 検索 → 詳細 → 治療方針)
+ *   ※ 機能ロジックは 27 と同一 (括弧非リンク化/最長一致表示等)
  ******************************************************/
 
-const APP_VERSION = '20250918-27';
+const APP_VERSION = '20250918-28';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -116,13 +113,12 @@ function parseAcuCSV(text){
   return out;
 }
 
-/* ==== 治療方針内 経穴トークン化 (索引用) ==== */
-/* 括弧グループを完全除去し、区切り変換後にトークン化 */
+/* ==== トークン化（括弧除去） ==== */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
     .replace(/（[^）]*）/g,'')
-    .replace(/\([^)]*\)/g,''); // 丸括弧コメント除去
+    .replace(/\([^)]*\)/g,'');
   return stripped
     .replace(/\r?\n/g,'/')
     .replace(/[，、]/g,'/')
@@ -145,7 +141,7 @@ function findAcupointByToken(token){
   return ACUPOINTS.find(p=>p.name === key);
 }
 
-/* ==== 表示用: 最長一致 + 括弧グループ分離 ==== */
+/* ==== 表示用 buildPointsHTML (括弧は非リンク) ==== */
 function buildPointsHTML(rawPoints, tokens){
   if(!rawPoints) return '';
   if(!tokens || !tokens.length) return escapeHTML(rawPoints);
@@ -161,14 +157,13 @@ function buildPointsHTML(rawPoints, tokens){
   while(i < len){
     const ch = rawPoints[i];
 
-    // 括弧グループ ( ... ) または （ ... ）
     if(ch === '(' || ch === '（'){
-      const closeChar = (ch === '(') ? ')' : '）';
+      const closeChar = ch === '(' ? ')' : '）';
       let j = i + 1;
       while(j < len && rawPoints[j] !== closeChar) j++;
-      if(j < len) j++; // include closing
+      if(j < len) j++;
       const group = rawPoints.slice(i, j);
-      out += escapeHTML(group); // そのまま
+      out += escapeHTML(group);
       i = j;
       continue;
     }
@@ -182,8 +177,7 @@ function buildPointsHTML(rawPoints, tokens){
     let matched = null;
     for(const tk of sortedTokens){
       if(rawPoints.startsWith(tk, i)){
-        matched = tk;
-        break;
+        matched = tk; break;
       }
     }
     if(!matched){
@@ -191,6 +185,7 @@ function buildPointsHTML(rawPoints, tokens){
       i++;
       continue;
     }
+
     const acu = findAcupointByToken(matched);
     if(acu){
       const importantClass = acu.important ? ' acu-important' : '';
@@ -204,7 +199,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* ==== Clinical CSV Parser (v26 ベース) ==== */
+/* ==== Clinical CSV Parser (同 v27) ==== */
 function rebuildLogicalRows(raw){
   const physical = raw.replace(/\r\n/g,'\n').split('\n');
   const rows = [];
@@ -372,7 +367,7 @@ function parseClinicalCSV(raw){
         } else {
           const next = table[i+1] || [];
           const commentRow = isPotentialCommentRow(next)? next : null;
-            patternNames.forEach((pName, idx)=>{
+          patternNames.forEach((pName, idx)=>{
             const col = idx+1;
             const cell = r[col] || '';
             if(!cell) return;
@@ -407,7 +402,7 @@ function parseClinicalCSV(raw){
       });
     });
   });
-  console.log('[ClinicalParser v27] Categories:', data.order);
+  console.log('[ClinicalParser v28] Categories:', data.order);
   return data;
 }
 
@@ -430,7 +425,6 @@ function rebuildAcuPointPatternIndex(){
       });
     });
   });
-  // 重複排除
   Object.keys(ACUPOINT_PATTERN_INDEX).forEach(k=>{
     const uniq = new Map();
     ACUPOINT_PATTERN_INDEX[k].forEach(e=>{
@@ -520,7 +514,6 @@ function showPointDetail(p){
   resultMuscleEl.textContent = p.muscle || '（筋肉未登録）';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
-  inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderRelatedPatterns(pointName){
   relatedSymptomsEl.innerHTML='';
@@ -541,7 +534,6 @@ function showUnknownPoint(name){
   resultMuscleEl.textContent='（筋肉未登録）';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   inlineAcupointResult.classList.remove('hidden');
-  inlineAcupointResult.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function selectPoint(p){
   clearSuggestions();
