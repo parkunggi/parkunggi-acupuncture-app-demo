@@ -1,11 +1,16 @@
 /******************************************************
  * 経穴検索 + 臨床病証二段選択 拡張版
- * - APP_VERSION 20250918-28
- * - 変更点: レイアウト入替 (症状・病証 → 検索 → 詳細 → 治療方針)
- *   ※ 機能ロジックは 27 と同一 (括弧非リンク化/最長一致表示等)
+ * - APP_VERSION 20250918-32
+ * - 変更点:
+ *   (1) サジェストを 2カラム (漢字 / 読み / バッジ) グリッド表示
+ *   (2) 要穴は赤字 (サジェスト内 .sug-name.important)
+ *   (3) ひらがな検索時、読み一致箇所を <mark> でハイライト
+ *   (4) バッジ: ★(要穴) / M(筋肉一致)
+ *   (5) ARIA: role="option" + aria-selected 対応
+ *   (6) 既存ロジックは最小変更（検索順位・フィルタは従来通り）
  ******************************************************/
 
-const APP_VERSION = '20250918-31';
+const APP_VERSION = '20250918-32';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -199,7 +204,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* ==== Clinical CSV Parser (同 v27) ==== */
+/* ==== Clinical CSV Parser ==== */
 function rebuildLogicalRows(raw){
   const physical = raw.replace(/\r\n/g,'\n').split('\n');
   const rows = [];
@@ -366,7 +371,7 @@ function parseClinicalCSV(raw){
           i++;
         } else {
           const next = table[i+1] || [];
-          const commentRow = isPotentialCommentRow(next)? next : null;
+            const commentRow = isPotentialCommentRow(next)? next : null;
           patternNames.forEach((pName, idx)=>{
             const col = idx+1;
             const cell = r[col] || '';
@@ -402,7 +407,7 @@ function parseClinicalCSV(raw){
       });
     });
   });
-  console.log('[ClinicalParser v28] Categories:', data.order);
+  console.log('[ClinicalParser v32] Categories:', data.order);
   return data;
 }
 
@@ -417,7 +422,7 @@ function rebuildAcuPointPatternIndex(){
       groups.forEach(g=>{
         (g.tokens||[]).forEach(tk=>{
           if(!tk) return;
-          if(seenInPattern.has(tk)) return;
+            if(seenInPattern.has(tk)) return;
           seenInPattern.add(tk);
           if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
           ACUPOINT_PATTERN_INDEX[tk].push({cat, pattern:pat});
@@ -460,30 +465,76 @@ function clearSuggestions(){
   suggestionListEl.innerHTML=''; suggestionListEl.classList.add('hidden');
   inputEl.setAttribute('aria-expanded','false');
 }
+
+/* ARIA 対応 setActive */
+function setActive(items, idx){
+  items.forEach(li=>{
+    li.classList.remove('active');
+    li.setAttribute('aria-selected','false');
+  });
+  if(items[idx]){
+    items[idx].classList.add('active');
+    items[idx].setAttribute('aria-selected','true');
+    items[idx].scrollIntoView({block:'nearest'});
+  }
+}
+
+/* 2カラム整列 renderSuggestions */
 function renderSuggestions(list){
   suggestionListEl.innerHTML='';
+  const qRaw = removeAllUnicodeSpaces(inputEl.value);
+  const hiraQuery = isHiraganaOnly(qRaw) ? qRaw : '';
+  const qRegex = hiraQuery
+    ? new RegExp(hiraQuery.replace(/([.*+?^=!:${}()|[\]\\])/g,'\\$1'),'g')
+    : null;
+
   list.slice(0,120).forEach((p,i)=>{
-    const li=document.createElement('li');
-    li.dataset.id=p.id;
-    if(p._matchType) li.dataset.matchType=p._matchType;
-    const badge = p._matchType==='muscle'
-      ? '<span class="match-badge" title="筋肉名でヒット">M</span>' : '';
-    li.innerHTML = `<span>${p.name}</span><span class="kana">${p.reading||''}</span>${badge}`;
+    const li = document.createElement('li');
+    li.dataset.id = p.id;
+    if(p._matchType) li.dataset.matchType = p._matchType;
+    li.setAttribute('role','option');
+    li.setAttribute('aria-selected', i===0 ? 'true':'false');
+
+    // 読み + ハイライト
+    let readingHTML = escapeHTML(p.reading || '');
+    if(qRegex && p.reading){
+      readingHTML = readingHTML.replace(qRegex, m=>`<mark>${m}</mark>`);
+    }
+
+    const important = !!p.important;
+    const nameClass = important ? 'sug-name important' : 'sug-name';
+
+    const badges = [];
+    if(important){
+      badges.push('<span class="badge badge-important" title="要穴">★</span>');
+    }
+    if(p._matchType === 'muscle'){
+      badges.push('<span class="badge badge-muscle" title="筋肉で一致">M</span>');
+    }
+
+    li.innerHTML = `
+      <span class="${nameClass}">${escapeHTML(p.name)}</span>
+      <span class="sug-slash">/</span>
+      <span class="sug-reading">${readingHTML}</span>
+      <span class="sug-badges">${badges.join('')}</span>
+    `;
+
     if(i===0) li.classList.add('active');
     li.addEventListener('click', ()=> selectPoint(p));
     suggestionListEl.appendChild(li);
   });
+
   if(!list.length){
     const li=document.createElement('li');
-    li.textContent='該当なし'; li.style.color='#888';
+    li.textContent='該当なし';
+    li.style.color='#888';
+    li.setAttribute('role','option');
+    li.setAttribute('aria-selected','false');
     suggestionListEl.appendChild(li);
   }
+
   suggestionListEl.classList.remove('hidden');
   inputEl.setAttribute('aria-expanded','true');
-}
-function setActive(items, idx){
-  items.forEach(li=>li.classList.remove('active'));
-  if(items[idx]){ items[idx].classList.add('active'); items[idx].scrollIntoView({block:'nearest'}); }
 }
 function handleSuggestionKeyboard(e){
   const items = Array.from(suggestionListEl.querySelectorAll('li'));
