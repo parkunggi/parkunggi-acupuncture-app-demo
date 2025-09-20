@@ -5,7 +5,7 @@
  *   ※ 機能ロジックは 27 と同一 (括弧非リンク化/最長一致表示等)
  ******************************************************/
 
-const APP_VERSION = '20250918-28';
+const APP_VERSION = '20250918-30';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
