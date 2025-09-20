@@ -94,17 +94,19 @@
     padding:0;
     list-style:disc inside;
   }
-  /* 病証名リスト(関連病証)の箇条書き丸を削除 */
+
+  /* 病証名リスト(関連病証)箇条書き記号を消す */
   #related-symptoms {
     list-style:none;
     padding-left:0;
     margin:0;
   }
   .info-container ul li { margin:0 0 3px; }
+
   .acu-important-flag {
     display:inline-block;
-    background:#e5eef9;
-    color:var(--brand-blue);
+    background:#ffe0dc;
+    color:var(--important-red);
     padding:2px 8px 2px;
     font-size:.68rem;
     border-radius:999px;
@@ -142,7 +144,6 @@
   }
   #search-btn:hover { background:#0b5ed7; }
 
-  /* サジェスト */
   .suggestion-wrapper { position:relative; }
   #acupoint-suggestion-list {
     margin:6px 0 0;
@@ -218,8 +219,9 @@
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
-  /* 治療方針内経穴リンク（高級感ブルー） */
-  .treat-main a, .acu-pattern-link {
+  /* 通常経穴リンク（青） */
+  .treat-main a,
+  .acu-pattern-link {
     font-size:.74rem;
     text-decoration:none;
     color:var(--brand-blue);
@@ -228,21 +230,23 @@
     padding:0 1px;
     transition:color .15s, border-color .15s, background-color .15s;
   }
-  .treat-main a:hover, .acu-pattern-link:hover {
+  .treat-main a:hover,
+  .acu-pattern-link:hover {
     color:var(--brand-blue-dark);
     border-color:var(--brand-blue-dark);
     background:rgba(11,77,156,.08);
     border-radius:3px;
   }
+  /* 要穴は赤 */
   .treat-main a.acu-important {
+    color:var(--important-red);
     font-weight:700;
-    color:var(--brand-blue);
-    border-bottom:1px solid rgba(11,77,156,.55);
+    border-bottom:1px solid var(--important-red);
   }
   .treat-main a.acu-important:hover {
-    color:var(--brand-blue-dark);
-    border-color:var(--brand-blue-dark);
-    background:linear-gradient(90deg,rgba(11,77,156,.10),rgba(11,77,156,.04));
+    color:#ff2a2a;
+    border-color:#ff2a2a;
+    background:linear-gradient(90deg,rgba(196,0,0,.08),rgba(196,0,0,.03));
   }
 
   .pattern-name-highlight {
@@ -356,6 +360,6 @@
 
 <script src="readings.js?v=20250918-14"></script>
 <script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-36"></script>
+<script src="app.js?v=20250918-37"></script>
 </body>
 </html>
