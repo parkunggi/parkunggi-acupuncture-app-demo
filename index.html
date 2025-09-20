@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>経穴検索デモ</title>
+<title>パク経穴検索ver_240920</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-store">
 <style>
@@ -18,6 +18,7 @@
     --badge-radius:10px;
     --brand-blue:#0b4d9c;
     --brand-blue-dark:#073466;
+    --home-hover-bg:#124f9f;
   }
   * { box-sizing:border-box; }
   body {
@@ -27,8 +28,52 @@
     background:#f5f7fa;
     color:#222;
   }
-  header { padding:6px 12px; background:#0d6efd; color:#fff; }
-  header h1 { margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.03em; }
+  header {
+    padding:6px 12px;
+    background:#0d6efd;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  header h1 {
+    margin:0;
+    font-size:1.05rem;
+    font-weight:600;
+    letter-spacing:.03em;
+    line-height:1.2;
+  }
+  #home-btn {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:34px;
+    height:34px;
+    border:1px solid rgba(255,255,255,.65);
+    background:rgba(255,255,255,.12);
+    color:#fff;
+    border-radius:8px;
+    cursor:pointer;
+    padding:0;
+    transition:background-color .18s,border-color .18s,transform .2s;
+  }
+  #home-btn:hover {
+    background:var(--home-hover-bg);
+    border-color:#fff;
+  }
+  #home-btn:active {
+    transform:scale(.95);
+  }
+  #home-btn:focus-visible {
+    outline:2px solid #fff;
+    outline-offset:2px;
+  }
+  #home-btn svg {
+    width:18px;
+    height:18px;
+    fill:currentColor;
+  }
+
   main { padding:12px 16px 48px; }
 
   #main-screen {
@@ -94,13 +139,7 @@
     padding:0;
     list-style:disc inside;
   }
-
-  /* 病証名リスト(関連病証)箇条書き記号を消す */
-  #related-symptoms {
-    list-style:none;
-    padding-left:0;
-    margin:0;
-  }
+  #related-symptoms { list-style:none; padding-left:0; margin:0; }
   .info-container ul li { margin:0 0 3px; }
 
   .acu-important-flag {
@@ -219,7 +258,6 @@
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
-  /* 通常経穴リンク（青） */
   .treat-main a,
   .acu-pattern-link {
     font-size:.74rem;
@@ -237,7 +275,6 @@
     background:rgba(11,77,156,.08);
     border-radius:3px;
   }
-  /* 要穴は赤 */
   .treat-main a.acu-important {
     color:var(--important-red);
     font-weight:700;
@@ -300,7 +337,14 @@
 </style>
 </head>
 <body>
-<header><h1>パク経穴検索ver_240920</h1></header>
+<header>
+  <h1>パク経穴検索ver_240920</h1>
+  <button id="home-btn" type="button" aria-label="ホーム (初期画面へ戻る)" title="ホーム">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/>
+    </svg>
+  </button>
+</header>
 <main>
   <section id="main-screen">
     <div class="left-inner">
@@ -309,7 +353,7 @@
         <input
           id="acupoint-search-input"
           type="text"
-          placeholder="経穴名(漢字/ひらがな)/筋肉名"
+          placeholder="経穴名（漢字 / ひらがな）または筋肉名"
           autocomplete="off"
           aria-autocomplete="list"
           aria-haspopup="listbox"
@@ -334,7 +378,7 @@
       </div>
 
       <div id="clinical-treatment-result" class="clinical-result hidden" aria-live="polite">
-        <h2 id="clinical-selected-title" style="margin-top:0;">治療方針(治法)： <span class="pattern-name-highlight"></span></h2>
+        <h2 id="clinical-selected-title" style="margin-top:0;">治療方針(治法)：<span class="pattern-name-highlight"></span></h2>
         <div id="clinical-treatment-groups"></div>
       </div>
     </div>
@@ -360,6 +404,6 @@
 
 <script src="readings.js?v=20250918-14"></script>
 <script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-37"></script>
+<script src="app.js?v=20250918-38"></script>
 </body>
 </html>
