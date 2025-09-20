@@ -31,8 +31,8 @@
     }
     .selection-container{order:1;}
     .search-container{order:2;}
-    .result-layout{order:3;}
-    .clinical-result{order:4; grid-column:1 / -1;} /* 治療方針は常に最下段・全幅 */
+    .result-layout{order:3;grid-column:1 / -1;} /* ← 修正追加 */
+    .clinical-result{order:4; grid-column:1 / -1;} /* 既存コメント維持 */
     .search-container h2,
     .selection-container h2{
       font-size:.95rem;
@@ -92,9 +92,7 @@
       color:#0066cc;
       font-weight:600;
     }
-    .treat-main a{
-      font-size:.75rem;
-    }
+    .treat-main a{ font-size:.75rem; }
     .acu-pattern-link{font-size:.72rem;}
     #status-float{
       position:fixed;
@@ -117,13 +115,12 @@
     .treat-point-link{white-space:nowrap;}
     .treat-main a.acu-important{color:#c40000;border-bottom-color:#c40000;font-weight:700;}
     .treat-main a.acu-important:hover{color:#ff2a2a;border-bottom-color:#ff2a2a;}
-    /* 小さい画面でも順序維持 */
     @media (max-width:720px){
       #main-screen{grid-template-columns:1fr;}
       .selection-container{order:1;}
       .search-container{order:2;}
-      .result-layout{order:3;}
-      .clinical-result{order:4;}
+      .result-layout{order:3;grid-column:1 / -1;}
+      .clinical-result{order:4;grid-column:1 / -1;}
     }
   </style>
 </head>
@@ -134,8 +131,6 @@
 
 <main>
   <section id="main-screen">
-
-    <!-- 症状・病証（先頭へ移動） -->
     <div class="selection-container">
       <h2>症状・病証</h2>
       <div class="clinical-select-group" style="margin-bottom:4px;">
@@ -152,7 +147,6 @@
       </div>
     </div>
 
-    <!-- 経穴検索（2番目に） -->
     <div class="search-container">
       <h2>経穴検索</h2>
       <input
@@ -171,40 +165,25 @@
       <button id="search-btn" type="button">検索</button>
     </div>
 
-    <!-- 経穴詳細（3番目） -->
     <div id="inline-acupoint-result" class="result-layout hidden" aria-live="polite">
       <div class="info-container">
         <h2 id="result-name">（経穴名）</h2>
-
-        <h3>経絡</h3>
-        <p id="result-meridian">（経絡未登録）</p>
-
-        <h3>部位</h3>
-        <p id="result-region">（部位未登録）</p>
-
-        <h3>要穴</h3>
-        <p id="result-important">-</p>
-
-        <h3>筋肉</h3>
-        <p id="result-muscle">（筋肉未登録）</p>
-
+        <h3>経絡</h3><p id="result-meridian">（経絡未登録）</p>
+        <h3>部位</h3><p id="result-region">（部位未登録）</p>
+        <h3>要穴</h3><p id="result-important">-</p>
+        <h3>筋肉</h3><p id="result-muscle">（筋肉未登録）</p>
         <h3>病証名</h3>
-        <ul id="related-symptoms">
-          <li>-</li>
-        </ul>
+        <ul id="related-symptoms"><li>-</li></ul>
       </div>
     </div>
 
-    <!-- 治療方針（常に最下部 & 全幅） -->
     <div id="clinical-treatment-result" class="clinical-result hidden" aria-live="polite">
       <h2 id="clinical-selected-title" style="margin-top:0;">（治療方針）</h2>
       <div id="clinical-treatment-groups"></div>
     </div>
-
   </section>
 </main>
 
-<!-- 浮動ステータス -->
 <div id="status-float">
   <span id="data-load-status">CSV 読み込み中...</span>
   <span id="clinical-load-status">臨床CSV 読み込み中...</span>
