@@ -25,7 +25,7 @@
   body { margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; line-height:1.45; background:#f5f7fa; color:#222; }
   header { padding:6px 12px; background:#0d6efd; color:#fff; display:flex; align-items:center; gap:10px; }
   header h1 { margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.03em; line-height:1.2; }
-  #home-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:1px solid rgba(255,255,255,.65); background:rgba(255,255,255,.12); color:#fff; border-radius:8px; cursor:pointer; padding:0; transition:background-color .18s,border-color .18s,transform .2s; }
+  #home-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:1px solid rgba(255,255,255,.65); background:rgba(255,255,255,.12); color:#fff; border-radius:8px; cursor:pointer; transition:background .2s,border-color .2s,transform .15s; font-weight:600; font-size:.65rem; }
   #home-btn:hover { background:var(--home-hover-bg); border-color:#fff; }
   #home-btn:active { transform:scale(.95); }
   #home-btn:focus-visible { outline:2px solid #fff; outline-offset:2px; }
@@ -140,6 +140,15 @@
     #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
   }
 </style>
+
+<!-- RED FIX: 強制赤字スタイル -->
+<style id="bui-red-fix">
+  #result-region .bui-red,
+  #result-region .bui-red * {
+    color:#d60000 !important;
+    font-weight:600;
+  }
+</style>
 </head>
 <body>
 <header>
@@ -205,8 +214,8 @@
   </div>
 </main>
 
-<script src="readings.js?v=20250918-14"></script>
-<script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-41"></script>
+<script src="readings.js?v=20250920-redfix"></script>
+<script src="muscle-map.js?v=20250920-redfix"></script>
+<script src="app.js?v=20250920-RED-FIX"></script>
 </body>
 </html>
