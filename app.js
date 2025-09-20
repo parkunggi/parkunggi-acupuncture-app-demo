@@ -1,13 +1,11 @@
 /******************************************************
  * 経穴検索 + 臨床病証二段選択
- * APP_VERSION 20250918-41
+ * APP_VERSION 20250920-RED-FIX
  * 変更:
- *  - 病証名表示: 内部の "【X】→Y" を UI 表示時に "Y→【X】" へ統一
- *  - patternSelect (病証セレクト) の option 表示も変換
- *  - 変換関数 getDisplayPatternName を用意し全表示箇所を集約
- * 他ロジックは v40 ベース
+ *  - [[...]] 赤字化強化 (冪等化 / regionRaw 保持 / 再適用保険 / MutationObserver)
+ *  - 既存ロジックは 20250918-41 をベース
  ******************************************************/
-const APP_VERSION = '20250918-41';
+const APP_VERSION = '20250920-RED-FIX';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -64,10 +62,18 @@ function removeAllUnicodeSpaces(str){
 function isSpace(ch){ return /[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/.test(ch); }
 function trimOuter(s){ return (s||'').trim(); }
 function isHiraganaOnly(s){ return !!s && /^[\u3041-\u3096]+$/.test(s); }
+
+/**
+ * [[...]] を <span class="bui-red">...</span> に変換
+ * - 冪等 (既に span があれば再変換しない)
+ * - ネスト/改行/極端な長文の誤マッチ防止 (最大120文字)
+ */
 function applyRedMarkup(text){
   if(!text) return '';
-  return text.replace(/\[\[(.+?)\]\]/g,'<span class="bui-red">$1</span>');
+  if(text.includes('<span class="bui-red">')) return text;
+  return text.replace(/\[\[([^\[\]\r\n]{1,120})\]\]/g,'<span class="bui-red">$1</span>');
 }
+
 function ensureCommentParens(c){
   if(!c) return '';
   if(/^\s*[（(]/.test(c)) return c;
@@ -86,11 +92,6 @@ function escapeHTML(s){
 }
 
 /* ==== 病証名 表示変換 ==== */
-/**
- * 内部形式: "【X】→Y"
- * UI表示:   "Y→【X】"
- * 条件: 左辺が【】囲い / 右辺が【】で始まらない(二重反転防止)
- */
 function transformPatternDisplay(original){
   const idx = original.indexOf('→');
   if(idx === -1) return original;
@@ -101,7 +102,6 @@ function transformPatternDisplay(original){
   }
   return original;
 }
-/* 集約: 追加の全UI表示はこの関数を使用 */
 function getDisplayPatternName(name){
   return transformPatternDisplay(name);
 }
@@ -126,13 +126,15 @@ function parseAcuCSV(text){
     const meridian = removeAllUnicodeSpaces(headCell) || currentMeridian;
     const pointName = removeAllUnicodeSpaces(trimOuter(cols[1]||''));
     if(!pointName) continue;
-    const region = trimOuter(cols[2]||'');
+    const regionRaw = trimOuter(cols[2]||'');
     const important = trimOuter(cols[3]||'');
+    const region = applyRedMarkup(regionRaw);
     out.push({
       id: pointName,
       name: pointName,
       meridian,
-      region: applyRedMarkup(region),
+      regionRaw,
+      region,
       important,
       reading: (READINGS[pointName]||'').trim(),
       muscle: MUSCLE_MAP[pointName] || ''
@@ -400,7 +402,7 @@ function parseClinicalCSV(raw){
         } else {
           const next=table[i+1]||[];
           const commentRow=isPotentialCommentRow(next)? next : null;
-          patternNames.forEach((pName,idx)=>{
+            patternNames.forEach((pName,idx)=>{
             const col=idx+1;
             const cell=r[col]||'';
             if(!cell) return;
@@ -428,7 +430,7 @@ function parseClinicalCSV(raw){
       });
     });
   });
-  console.log('[ClinicalParser v41]', data.order);
+  console.log('[ClinicalParser RED-FIX]', data.order);
   return data;
 }
 
@@ -444,7 +446,7 @@ function rebuildAcuPointPatternIndex(){
         (g.tokens||[]).forEach(tk=>{
           if(!tk) return;
           if(seen.has(tk)) return;
-            seen.add(tk);
+          seen.add(tk);
           if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
           ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
@@ -511,7 +513,7 @@ function setActive(items, idx){
   });
   if(items[idx]){
     items[idx].classList.add('active');
-    items[idx].setAttribute('aria-selected','true');
+    li.setAttribute('aria-selected','true');
     items[idx].scrollIntoView({block:'nearest'});
   }
 }
@@ -574,9 +576,14 @@ function handleSuggestionKeyboard(e){
 
 /* ==== 詳細 ==== */
 function showPointDetail(p){
+  let regionHTML = p.region || '';
+  if(regionHTML.includes('[[')){
+    if(p.regionRaw) regionHTML = applyRedMarkup(p.regionRaw);
+    else regionHTML = applyRedMarkup(regionHTML);
+  }
   resultNameEl.textContent = `${p.name}${p.reading?` (${p.reading})`:''}`;
   resultMeridianEl.textContent = p.meridian || '（経絡未登録）';
-  resultRegionEl.innerHTML = p.region || '（部位未登録）';
+  resultRegionEl.innerHTML = regionHTML || '（部位未登録）';
   if(p.important){
     resultImportantEl.innerHTML = `<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
   } else resultImportantEl.textContent='-';
@@ -622,8 +629,8 @@ categorySelect.addEventListener('change', ()=>{
   if(!cat || !CLINICAL_DATA.cats[cat]){ requestAnimationFrame(equalizeTopCards); return; }
   CLINICAL_DATA.cats[cat].patternOrder.forEach(pat=>{
     const opt=document.createElement('option');
-    opt.value=pat;           // 内部キー
-    opt.textContent=getDisplayPatternName(pat); // 表示は変換
+    opt.value=pat;
+    opt.textContent=getDisplayPatternName(pat);
     patternSelect.appendChild(opt);
   });
   patternSelect.disabled=false;
@@ -638,7 +645,6 @@ patternSelect.addEventListener('change', ()=>{
   if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]){ requestAnimationFrame(equalizeTopCards); return; }
   const groups=CLINICAL_DATA.cats[cat].patterns[pat];
 
-  // 見出し病証名表示
   const span=clinicalTitleEl.querySelector('.pattern-name-highlight');
   if(span) span.textContent=getDisplayPatternName(pat);
 
@@ -782,7 +788,7 @@ async function loadClinicalCSV(){
     CLINICAL_DATA.order.forEach(cat=>{
       const opt=document.createElement('option');
       opt.value=cat;
-      opt.textContent=cat; // カテゴリ名はそのまま
+      opt.textContent=cat;
       categorySelect.appendChild(opt);
     });
     rebuildAcuPointPatternIndex();
@@ -806,5 +812,22 @@ window.addEventListener('resize', equalizeTopCards);
   requestAnimationFrame(()=>{
     inputEl.focus();
     inputEl.select();
+  });
+})();
+
+/* ==== [[ ]] 最終フォールバック ==== */
+(function installRegionFallback(){
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const container = document.getElementById('inline-acupoint-result');
+    if(!container) return;
+    const patch = ()=>{
+      const el = document.getElementById('result-region');
+      if(el && el.innerHTML && el.innerHTML.includes('[[')){
+        el.innerHTML = applyRedMarkup(el.innerHTML);
+      }
+    };
+    const mo = new MutationObserver(patch);
+    mo.observe(container,{ childList:true, subtree:true, characterData:true });
+    patch();
   });
 })();
