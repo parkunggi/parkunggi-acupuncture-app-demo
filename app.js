@@ -1,12 +1,13 @@
 /******************************************************
- * 経穴検索 + 臨床病証二段選択 (Homeボタン & iPad自動スクロール抑止改修)
- * APP_VERSION 20250918-38
- * - 追加: ホームボタン (#home-btn) で初期状態へリセット
- * - 変更: 病証リンククリック時の scrollIntoView を廃止 (iPadでの意図しない自動スクロール防止)
- * 既存の括弧内経穴リンク化・空白無視ロジックは v37 と同様
+ * 経穴検索 + 臨床病証二段選択
+ * APP_VERSION 20250918-39
+ * 変更:
+ *  - placeholder 文言を「経穴名(漢字/ひらがな)/筋肉名」に変更 (index.html側)
+ *  - 初期表示 & ホームボタン押下時に検索入力へ自動フォーカス + 選択
+ *  - CSV 正常件数表示から "(正常)" を削除 (不一致時のみ想定件数を追記)
+ *  - その他ロジックは v38 を踏襲
  ******************************************************/
-const APP_VERSION = '20250918-38';
-/* === 既存定数/変数 (前バージョン v37 と同様) === */
+const APP_VERSION = '20250918-39';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -188,16 +189,12 @@ function linkifyParenthesisGroup(group){
     let consumed = 0;
     for(const name of ACUPOINT_NAME_LIST){
       const c = matchTokenWithSpaces(inner, i, name);
-      if(c){
-        matched = name;
-        consumed = c;
-        break;
-      }
+      if(c){ matched = name; consumed = c; break; }
     }
     if(matched){
       const p = findAcupointByToken(matched);
       if(p){
-        const imp = p.important ? ' acu-important' : '';
+        const imp = p.important ? ' acu-important':'';
         out += `<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`;
       } else {
         out += escapeHTML(matched);
@@ -211,19 +208,17 @@ function linkifyParenthesisGroup(group){
   return escapeHTML(open) + out + escapeHTML(close);
 }
 
-/* ==== 治療ポイントHTML ==== */
+/* ==== 治療ポイント HTML ==== */
 function buildPointsHTML(rawPoints, tokens){
   if(!rawPoints) return '';
   const uniqueTokens = Array.from(new Set(tokens||[]));
   const sortedTokens = uniqueTokens.sort((a,b)=> b.length - a.length);
 
-  let i = 0;
-  let out = '';
-  const len = rawPoints.length;
+  let i=0, out='', len=rawPoints.length;
   while(i < len){
     const ch = rawPoints[i];
     if(ch === '(' || ch === '（'){
-      const closeChar = (ch === '(') ? ')' : '）';
+      const closeChar = ch === '(' ? ')' : '）';
       let j = i + 1;
       while(j < len && rawPoints[j] !== closeChar) j++;
       if(j < len) j++;
@@ -258,7 +253,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* ==== Clinical CSV Parser (前バージョン踏襲) ==== */
+/* ==== Clinical CSV Parser ==== */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -307,7 +302,7 @@ function isPotentialCommentRow(cols){
   return cols.slice(1).some(c=>/^[（(]/.test(c));
 }
 function dissectTreatmentCell(cell){
-  if(!cell) return {label:'',rawPoints:'',comment:''};
+  if(!cell) return { label:'', rawPoints:'', comment:'' };
   const lines=cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
   let comment='';
   if(lines.length && /^[（(]/.test(lines[lines.length-1])) comment=lines.pop();
@@ -318,14 +313,14 @@ function dissectTreatmentCell(cell){
     comment=comment||tail[1];
     main=main.slice(0,tail.index).trim();
   }
-  let label='',rawPoints='';
+  let label='', rawPoints='';
   const p1=main.indexOf('：'); const p2=main.indexOf(':');
   let sep=-1;
   if(p1>=0 && p2>=0) sep=Math.min(p1,p2);
   else sep=p1>=0? p1 : p2;
   if(sep>=0){ label=main.slice(0,sep).trim(); rawPoints=main.slice(sep+1).trim(); }
   else label=main.trim();
-  return {label,rawPoints,comment};
+  return { label, rawPoints, comment };
 }
 function isInterleavedTreatmentRow(after, patternCount){
   if(!after.length) return false;
@@ -333,19 +328,24 @@ function isInterleavedTreatmentRow(after, patternCount){
   const comm=after.filter(c=>c && /^[（(]/.test(c));
   if(!comm.length) return false;
   if(!treat.length) return false;
-  return (treat.length+comm.length)>=patternCount;
+  return (treat.length+comm.length) >= patternCount;
 }
 function parseInterleavedRow(after, patternNames){
   const results=[]; let pIndex=0; let i=0;
   while(i<after.length && pIndex<patternNames.length){
-    while(i<after.length && (!after[i] || /^[（(]/.test(after[i]) || !(after[i].includes('：')||after[i].includes(':')))) i++;
+    while(i<after.length &&
+          (!after[i] ||
+           /^[（(]/.test(after[i]) ||
+           !(after[i].includes('：')||after[i].includes(':')))){
+      i++;
+    }
     if(i>=after.length) break;
     const treatCell=after[i]; i++;
     let commentCell='';
     if(i<after.length && /^[（(]/.test(after[i])){ commentCell=after[i]; i++; }
     const {label,rawPoints,comment}=dissectTreatmentCell(treatCell);
     if(label||rawPoints){
-      results.push({pattern:patternNames[pIndex], label, rawPoints, comment:commentCell||comment||''});
+      results.push({pattern:patternNames[pIndex],label,rawPoints,comment:commentCell||comment||''});
       pIndex++;
     }
   }
@@ -403,14 +403,16 @@ function parseClinicalCSV(raw){
             const col=idx+1;
             const cell=r[col]||'';
             if(!cell) return;
-            const {label, rawPoints, comment}=dissectTreatmentCell(cell);
+            const {label,rawPoints,comment}=dissectTreatmentCell(cell);
             if(!label && !rawPoints) return;
             let finalComment=comment;
             if(!finalComment && commentRow){
               const cc=commentRow[col]||'';
               if(/^[（(]/.test(cc)) finalComment=cc;
             }
-            data.cats[category].patterns[pName].push({label, rawPoints, comment:finalComment});
+            data.cats[category].patterns[pName].push({
+              label, rawPoints, comment:finalComment
+            });
           });
           i += commentRow? 2:1;
         }
@@ -423,11 +425,11 @@ function parseClinicalCSV(raw){
     const catObj=data.cats[cat];
     catObj.patternOrder.forEach(pn=>{
       catObj.patterns[pn].forEach(g=>{
-        if(!g.tokens) g.tokens = parseTreatmentPoints(g.rawPoints);
+        if(!g.tokens) g.tokens=parseTreatmentPoints(g.rawPoints);
       });
     });
   });
-  console.log('[ClinicalParser v38]', data.order);
+  console.log('[ClinicalParser v39]', data.order);
   return data;
 }
 
@@ -445,7 +447,7 @@ function rebuildAcuPointPatternIndex(){
           if(seen.has(tk)) return;
           seen.add(tk);
           if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
-          ACUPOINT_PATTERN_INDEX[tk].push({cat, pattern:pat});
+          ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
       });
     });
@@ -485,17 +487,17 @@ function filterPoints(qInput){
     if(!list.length) list=ACUPOINTS.filter(p=>p.reading && p.reading.includes(q));
     return list.map(p=>({...p,_matchType:'name'}));
   }
-  const nameMatches=[]; const seen=new Set();
+  const nm=[]; const seen=new Set();
   for(const p of ACUPOINTS){
-    if(p.name.includes(q)){ nameMatches.push({...p,_matchType:'name'}); seen.add(p.id); }
+    if(p.name.includes(q)){ nm.push({...p,_matchType:'name'}); seen.add(p.id); }
   }
-  const muscleMatches=[];
+  const mm=[];
   for(const p of ACUPOINTS){
     if(!p.muscle) continue;
     if(seen.has(p.id)) continue;
-    if(p.muscle.includes(q)) muscleMatches.push({...p,_matchType:'muscle'});
+    if(p.muscle.includes(q)) mm.push({...p,_matchType:'muscle'});
   }
-  return nameMatches.concat(muscleMatches);
+  return nm.concat(mm);
 }
 function clearSuggestions(){
   suggestionListEl.innerHTML='';
@@ -638,8 +640,8 @@ patternSelect.addEventListener('change', ()=>{
   clinicalGroupsEl.innerHTML='';
   if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]){ requestAnimationFrame(equalizeTopCards); return; }
   const groups=CLINICAL_DATA.cats[cat].patterns[pat];
-  const span = clinicalTitleEl.querySelector('.pattern-name-highlight');
-  if(span) span.textContent = pat;
+  const span=clinicalTitleEl.querySelector('.pattern-name-highlight');
+  if(span) span.textContent=pat;
 
   groups.forEach(g=>{
     const tokens=g.tokens || parseTreatmentPoints(g.rawPoints);
@@ -667,7 +669,7 @@ patternSelect.addEventListener('change', ()=>{
   requestAnimationFrame(equalizeTopCards);
 });
 
-/* ==== 病証リンク: scrollIntoView 廃止 ==== */
+/* ==== 病証リンク ==== */
 document.addEventListener('click', e=>{
   const a=e.target.closest('.acu-pattern-link');
   if(!a) return;
@@ -680,36 +682,29 @@ document.addEventListener('click', e=>{
   categorySelect.dispatchEvent(new Event('change'));
   patternSelect.value=pat;
   patternSelect.dispatchEvent(new Event('change'));
-  // ここでの scrollIntoView を削除 (iPad の自動スクロール防止)
+  // scrollIntoView しない (iPad の自動スクロール抑止)
 });
 
 /* ==== ホームボタン ==== */
 function goHome(){
-  // 検索入力とサジェスト
   inputEl.value='';
   clearSuggestions();
-
-  // 経穴詳細パネルを非表示
   inlineAcupointResult.classList.add('hidden');
-
-  // カテゴリ/病証選択解除
   categorySelect.value='';
   categorySelect.dispatchEvent(new Event('change'));
   patternSelect.value='';
   patternSelect.disabled=true;
-
-  // 治療方針領域初期化
   clinicalGroupsEl.innerHTML='';
   clinicalResultEl.classList.add('hidden');
-  const span = clinicalTitleEl.querySelector('.pattern-name-highlight');
+  const span=clinicalTitleEl.querySelector('.pattern-name-highlight');
   if(span) span.textContent='';
-
-  // 関連病証リスト初期化
   relatedSymptomsEl.innerHTML='<li>-</li>';
-
-  // 画面先頭へ
-  window.scrollTo({top:0, behavior:'smooth'});
-
+  window.scrollTo({top:0,behavior:'smooth'});
+  // フォーカス
+  requestAnimationFrame(()=>{
+    inputEl.focus();
+    inputEl.select();
+  });
   requestAnimationFrame(equalizeTopCards);
 }
 homeBtn.addEventListener('click', goHome);
@@ -762,13 +757,17 @@ async function loadAcuCSV(){
     const nameCount={};
     parsed=parsed.map(p=>{
       nameCount[p.name]=(nameCount[p.name]||0)+1;
-      return {...p, id: nameCount[p.name]>1 ? `${p.name}__${nameCount[p.name]}`:p.name};
+      return {...p, id:nameCount[p.name]>1 ? `${p.name}__${nameCount[p.name]}`:p.name};
     });
     ACUPOINTS=parsed;
     buildNameLookup();
     DATA_READY=true;
     const total=ACUPOINTS.length;
-    statusEl.textContent=`経穴CSV: ${total}件 (${total===EXPECTED_TOTAL?'正常':`想定${EXPECTED_TOTAL}`})`;
+    if(total===EXPECTED_TOTAL){
+      statusEl.textContent=`経穴CSV: ${total}件`;
+    } else {
+      statusEl.textContent=`経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`;
+    }
   }catch(err){
     console.error(err);
     statusEl.textContent='経穴CSV: 失敗 '+err.message;
@@ -808,4 +807,9 @@ window.addEventListener('resize', equalizeTopCards);
   loadAcuCSV();
   loadClinicalCSV();
   requestAnimationFrame(equalizeTopCards);
+  // 初期フォーカス & 全選択
+  requestAnimationFrame(()=>{
+    inputEl.focus();
+    inputEl.select();
+  });
 })();
