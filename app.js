@@ -1,13 +1,13 @@
 /******************************************************
  * 経穴検索 + 臨床病証二段選択
- * APP_VERSION 20250918-39
+ * APP_VERSION 20250918-41
  * 変更:
- *  - placeholder 文言を「経穴名(漢字/ひらがな)/筋肉名」に変更 (index.html側)
- *  - 初期表示 & ホームボタン押下時に検索入力へ自動フォーカス + 選択
- *  - CSV 正常件数表示から "(正常)" を削除 (不一致時のみ想定件数を追記)
- *  - その他ロジックは v38 を踏襲
+ *  - 病証名表示: 内部の "【X】→Y" を UI 表示時に "Y→【X】" へ統一
+ *  - patternSelect (病証セレクト) の option 表示も変換
+ *  - 変換関数 getDisplayPatternName を用意し全表示箇所を集約
+ * 他ロジックは v40 ベース
  ******************************************************/
-const APP_VERSION = '20250918-39';
+const APP_VERSION = '20250918-41';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -61,9 +61,7 @@ function removeAllUnicodeSpaces(str){
     .replace(/[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g,'')
     .replace(/\uFEFF/g,'');
 }
-function isSpace(ch){
-  return /[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/.test(ch);
-}
+function isSpace(ch){ return /[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/.test(ch); }
 function trimOuter(s){ return (s||'').trim(); }
 function isHiraganaOnly(s){ return !!s && /^[\u3041-\u3096]+$/.test(s); }
 function applyRedMarkup(text){
@@ -87,27 +85,48 @@ function escapeHTML(s){
   });
 }
 
-/* ==== CSV ==== */
+/* ==== 病証名 表示変換 ==== */
+/**
+ * 内部形式: "【X】→Y"
+ * UI表示:   "Y→【X】"
+ * 条件: 左辺が【】囲い / 右辺が【】で始まらない(二重反転防止)
+ */
+function transformPatternDisplay(original){
+  const idx = original.indexOf('→');
+  if(idx === -1) return original;
+  const left = original.slice(0, idx).trim();
+  const right = original.slice(idx + 1).trim();
+  if(/^【.+】$/.test(left) && right && !/^【.+】$/.test(right)){
+    return `${right}→${left}`;
+  }
+  return original;
+}
+/* 集約: 追加の全UI表示はこの関数を使用 */
+function getDisplayPatternName(name){
+  return transformPatternDisplay(name);
+}
+
+/* ==== CSV パース ==== */
 function parseAcuCSV(text){
   const lines = text.split(/\r?\n/);
   const out = [];
-  let currentMeridian = '';
+  let currentMeridian='';
   for(const raw of lines){
     if(!raw) continue;
     const line = raw.replace(/\uFEFF/g,'');
     if(!line.trim()) continue;
-    const cols = line.split(',');
+    const cols=line.split(',');
     const headCell = cols[0]? cols[0].trim() : '';
     if(/^\s*\d+(\.|．)?/.test(headCell)){
       currentMeridian = removeAllUnicodeSpaces(headCell.replace(/^\s*\d+(\.|．)?\s*/,''));
       continue;
     }
     if(/経絡/.test(headCell) && /経穴/.test(cols[1]||'')) continue;
-    if(cols.length < 2) continue;
-    const meridian  = removeAllUnicodeSpaces(headCell) || currentMeridian;
+    if(cols.length<2) continue;
+    const meridian = removeAllUnicodeSpaces(headCell) || currentMeridian;
     const pointName = removeAllUnicodeSpaces(trimOuter(cols[1]||''));
     if(!pointName) continue;
-    const region    = trimOuter(cols[2]||'');
+    const region = trimOuter(cols[2]||'');
     const important = trimOuter(cols[3]||'');
     out.push({
       id: pointName,
@@ -115,14 +134,14 @@ function parseAcuCSV(text){
       meridian,
       region: applyRedMarkup(region),
       important,
-      reading: (READINGS[pointName] || '').trim(),
+      reading: (READINGS[pointName]||'').trim(),
       muscle: MUSCLE_MAP[pointName] || ''
     });
   }
   return out;
 }
 
-/* ==== トークン ==== */
+/* ==== 治療点トークン ==== */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
@@ -142,12 +161,12 @@ function parseTreatmentPoints(raw){
     .filter(Boolean);
 }
 function normalizeAcuLookupName(name){
-  return removeAllUnicodeSpaces(name || '').trim();
+  return removeAllUnicodeSpaces(name||'').trim();
 }
 function findAcupointByToken(token){
   const key = normalizeAcuLookupName(token);
   if(!key) return null;
-  return ACUPOINTS.find(p=>p.name === key);
+  return ACUPOINTS.find(p=>p.name===key);
 }
 
 /* ==== 名称リスト ==== */
@@ -158,13 +177,12 @@ function buildNameLookup(){
 
 /* ==== 空白無視マッチ ==== */
 function matchTokenWithSpaces(raw, pos, token){
-  let i = pos;
-  let k = 0;
-  const len = raw.length;
-  while(k < token.length){
-    while(i < len && isSpace(raw[i])) i++;
-    if(i >= len) return 0;
-    if(raw[i] !== token[k]) return 0;
+  let i=pos, k=0;
+  const len=raw.length;
+  while(k<token.length){
+    while(i<len && isSpace(raw[i])) i++;
+    if(i>=len) return 0;
+    if(raw[i]!==token[k]) return 0;
     i++; k++;
   }
   return i - pos;
@@ -172,82 +190,70 @@ function matchTokenWithSpaces(raw, pos, token){
 
 /* ==== 括弧内リンク化 ==== */
 function linkifyParenthesisGroup(group){
-  if(group.length < 2) return escapeHTML(group);
-  const open = group[0];
-  const close = group[group.length-1];
-  const inner = group.slice(1, -1);
-  let i = 0;
-  let out = '';
-  while(i < inner.length){
-    const ch = inner[i];
-    if(isSpace(ch)){
-      out += escapeHTML(ch);
-      i++;
-      continue;
-    }
-    let matched = null;
-    let consumed = 0;
+  if(group.length<2) return escapeHTML(group);
+  const open=group[0], close=group[group.length-1];
+  const inner=group.slice(1,-1);
+  let i=0, out='';
+  while(i<inner.length){
+    const ch=inner[i];
+    if(isSpace(ch)){ out+=escapeHTML(ch); i++; continue; }
+    let matched=null, consumed=0;
     for(const name of ACUPOINT_NAME_LIST){
-      const c = matchTokenWithSpaces(inner, i, name);
-      if(c){ matched = name; consumed = c; break; }
+      const c=matchTokenWithSpaces(inner, i, name);
+      if(c){ matched=name; consumed=c; break; }
     }
     if(matched){
-      const p = findAcupointByToken(matched);
+      const p=findAcupointByToken(matched);
       if(p){
-        const imp = p.important ? ' acu-important':'';
-        out += `<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`;
+        const imp=p.important?' acu-important':'';
+        out+=`<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`;
       } else {
-        out += escapeHTML(matched);
+        out+=escapeHTML(matched);
       }
-      i += consumed;
+      i+=consumed;
     } else {
-      out += escapeHTML(ch);
+      out+=escapeHTML(ch);
       i++;
     }
   }
-  return escapeHTML(open) + out + escapeHTML(close);
+  return escapeHTML(open)+out+escapeHTML(close);
 }
 
 /* ==== 治療ポイント HTML ==== */
 function buildPointsHTML(rawPoints, tokens){
   if(!rawPoints) return '';
-  const uniqueTokens = Array.from(new Set(tokens||[]));
-  const sortedTokens = uniqueTokens.sort((a,b)=> b.length - a.length);
-
+  const uniqueTokens=Array.from(new Set(tokens||[]));
+  const sortedTokens=uniqueTokens.sort((a,b)=> b.length - a.length);
   let i=0, out='', len=rawPoints.length;
-  while(i < len){
-    const ch = rawPoints[i];
-    if(ch === '(' || ch === '（'){
-      const closeChar = ch === '(' ? ')' : '）';
-      let j = i + 1;
-      while(j < len && rawPoints[j] !== closeChar) j++;
-      if(j < len) j++;
-      out += linkifyParenthesisGroup(rawPoints.slice(i,j));
-      i = j;
+  while(i<len){
+    const ch=rawPoints[i];
+    if(ch==='(' || ch==='（'){
+      const closeChar= ch==='(' ? ')' : '）';
+      let j=i+1;
+      while(j<len && rawPoints[j]!==closeChar) j++;
+      if(j<len) j++;
+      out+=linkifyParenthesisGroup(rawPoints.slice(i,j));
+      i=j;
       continue;
     }
-    if(isSpace(ch)){
-      out += escapeHTML(ch);
-      i++;
-      continue;
-    }
+    if(isSpace(ch)){ out+=escapeHTML(ch); i++; continue; }
     let matched=null, consumed=0;
     for(const tk of sortedTokens){
-      const c = matchTokenWithSpaces(rawPoints, i, tk);
+      const c=matchTokenWithSpaces(rawPoints, i, tk);
       if(c){ matched=tk; consumed=c; break; }
     }
     if(matched){
       const acu=findAcupointByToken(matched);
       if(acu){
         const imp=acu.important?' acu-important':'';
-        out += `<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(acu.name)}">${escapeHTML(acu.name)}</a>`;
+        out+=`<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(acu.name)}">${escapeHTML(acu.name)}</a>`;
       } else {
-        out += `<a href="#" class="treat-point-link treat-point-unknown" data-point="${escapeHTML(matched)}" data-unknown="1">${escapeHTML(matched)}</a>`;
+        out+=`<a href="#" class="treat-point-link treat-point-unknown" data-point="${escapeHTML(matched)}" data-unknown="1">${escapeHTML(matched)}</a>`;
       }
-      i += consumed;
+      i+=consumed;
       continue;
     }
-    out += escapeHTML(ch);
+    out+=escapeHTML(ch);
     i++;
   }
   return out;
@@ -260,9 +266,7 @@ function rebuildLogicalRows(raw){
   for(const line of physical){
     if(buf) buf+='\n'+line; else buf=line;
     quotes=(buf.match(/"/g)||[]).length;
-    if(quotes%2===0){
-      rows.push(buf); buf=''; quotes=0;
-    }
+    if(quotes%2===0){ rows.push(buf); buf=''; quotes=0; }
   }
   if(buf) rows.push(buf);
   return rows;
@@ -271,12 +275,12 @@ function parseCSVLogicalRow(row){
   const cols=[]; let cur=''; let inQ=false;
   for(let i=0;i<row.length;i++){
     const ch=row[i];
-    if(ch === '"'){
-      if(inQ && row[i+1] === '"'){ cur+='"'; i++; }
+    if(ch==='"'){
+      if(inQ && row[i+1]==='"'){ cur+='"'; i++; }
       else inQ=!inQ;
       continue;
     }
-    if(ch === ',' && !inQ){
+    if(ch===',' && !inQ){
       cols.push(cur); cur='';
     } else cur+=ch;
   }
@@ -302,7 +306,7 @@ function isPotentialCommentRow(cols){
   return cols.slice(1).some(c=>/^[（(]/.test(c));
 }
 function dissectTreatmentCell(cell){
-  if(!cell) return { label:'', rawPoints:'', comment:'' };
+  if(!cell) return {label:'',rawPoints:'',comment:''};
   const lines=cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
   let comment='';
   if(lines.length && /^[（(]/.test(lines[lines.length-1])) comment=lines.pop();
@@ -311,16 +315,18 @@ function dissectTreatmentCell(cell){
   const tail=main.match(/([（(].*?[）)])\s*$/);
   if(tail){
     comment=comment||tail[1];
-    main=main.slice(0,tail.index).trim();
+    main=main.slice(0, tail.index).trim();
   }
   let label='', rawPoints='';
   const p1=main.indexOf('：'); const p2=main.indexOf(':');
   let sep=-1;
   if(p1>=0 && p2>=0) sep=Math.min(p1,p2);
   else sep=p1>=0? p1 : p2;
-  if(sep>=0){ label=main.slice(0,sep).trim(); rawPoints=main.slice(sep+1).trim(); }
-  else label=main.trim();
-  return { label, rawPoints, comment };
+  if(sep>=0){
+    label=main.slice(0,sep).trim();
+    rawPoints=main.slice(sep+1).trim();
+  } else label=main.trim();
+  return {label,rawPoints,comment};
 }
 function isInterleavedTreatmentRow(after, patternCount){
   if(!after.length) return false;
@@ -328,17 +334,12 @@ function isInterleavedTreatmentRow(after, patternCount){
   const comm=after.filter(c=>c && /^[（(]/.test(c));
   if(!comm.length) return false;
   if(!treat.length) return false;
-  return (treat.length+comm.length) >= patternCount;
+  return (treat.length+comm.length)>=patternCount;
 }
 function parseInterleavedRow(after, patternNames){
   const results=[]; let pIndex=0; let i=0;
   while(i<after.length && pIndex<patternNames.length){
-    while(i<after.length &&
-          (!after[i] ||
-           /^[（(]/.test(after[i]) ||
-           !(after[i].includes('：')||after[i].includes(':')))){
-      i++;
-    }
+    while(i<after.length && (!after[i] || /^[（(]/.test(after[i]) || !(after[i].includes('：')||after[i].includes(':')))) i++;
     if(i>=after.length) break;
     const treatCell=after[i]; i++;
     let commentCell='';
@@ -399,7 +400,7 @@ function parseClinicalCSV(raw){
         } else {
           const next=table[i+1]||[];
           const commentRow=isPotentialCommentRow(next)? next : null;
-          patternNames.forEach((pName, idx)=>{
+          patternNames.forEach((pName,idx)=>{
             const col=idx+1;
             const cell=r[col]||'';
             if(!cell) return;
@@ -410,9 +411,7 @@ function parseClinicalCSV(raw){
               const cc=commentRow[col]||'';
               if(/^[（(]/.test(cc)) finalComment=cc;
             }
-            data.cats[category].patterns[pName].push({
-              label, rawPoints, comment:finalComment
-            });
+            data.cats[category].patterns[pName].push({label,rawPoints,comment:finalComment});
           });
           i += commentRow? 2:1;
         }
@@ -429,13 +428,13 @@ function parseClinicalCSV(raw){
       });
     });
   });
-  console.log('[ClinicalParser v39]', data.order);
+  console.log('[ClinicalParser v41]', data.order);
   return data;
 }
 
 /* ==== 逆引き ==== */
 function rebuildAcuPointPatternIndex(){
-  ACUPOINT_PATTERN_INDEX = {};
+  ACUPOINT_PATTERN_INDEX={};
   CLINICAL_DATA.order.forEach(cat=>{
     const catObj=CLINICAL_DATA.cats[cat];
     catObj.patternOrder.forEach(pat=>{
@@ -445,7 +444,7 @@ function rebuildAcuPointPatternIndex(){
         (g.tokens||[]).forEach(tk=>{
           if(!tk) return;
           if(seen.has(tk)) return;
-          seen.add(tk);
+            seen.add(tk);
           if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
           ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
@@ -464,7 +463,7 @@ function rebuildAcuPointPatternIndex(){
 
 /* ==== 高さ同期 ==== */
 function equalizeTopCards(){
-  if(window.innerWidth < 860){
+  if(window.innerWidth<860){
     searchCard.style.height='';
     symptomCard.style.height='';
     return;
@@ -481,7 +480,7 @@ function equalizeTopCards(){
 /* ==== Suggestion ==== */
 function filterPoints(qInput){
   const q=removeAllUnicodeSpaces(qInput);
-  if(q.length < MIN_QUERY_LENGTH) return [];
+  if(q.length<MIN_QUERY_LENGTH) return [];
   if(isHiraganaOnly(q)){
     let list=ACUPOINTS.filter(p=>p.reading && p.reading.startsWith(q));
     if(!list.length) list=ACUPOINTS.filter(p=>p.reading && p.reading.includes(q));
@@ -520,9 +519,7 @@ function renderSuggestions(list){
   suggestionListEl.innerHTML='';
   const qRaw=removeAllUnicodeSpaces(inputEl.value);
   const hiraQuery=isHiraganaOnly(qRaw)? qRaw : '';
-  const qRegex = hiraQuery
-    ? new RegExp(hiraQuery.replace(/([.*+?^=!:${}()|[\\]\\])/g,'\\$1'),'g')
-    : null;
+  const qRegex = hiraQuery ? new RegExp(hiraQuery.replace(/([.*+?^=!:${}()|[\\]\\])/g,'\\$1'),'g') : null;
   list.slice(0,120).forEach((p,i)=>{
     const li=document.createElement('li');
     li.dataset.id=p.id;
@@ -582,9 +579,7 @@ function showPointDetail(p){
   resultRegionEl.innerHTML = p.region || '（部位未登録）';
   if(p.important){
     resultImportantEl.innerHTML = `<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
-  } else {
-    resultImportantEl.textContent='-';
-  }
+  } else resultImportantEl.textContent='-';
   resultMuscleEl.textContent = p.muscle || '（筋肉未登録）';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
@@ -595,8 +590,9 @@ function renderRelatedPatterns(pointName){
     relatedSymptomsEl.innerHTML='<li>-</li>'; return;
   }
   ACUPOINT_PATTERN_INDEX[pointName].forEach(entry=>{
+    const display = getDisplayPatternName(entry.pattern);
     const li=document.createElement('li');
-    li.innerHTML = `<a href="#" class="acu-pattern-link" data-cat="${escapeHTML(entry.cat)}" data-pattern="${escapeHTML(entry.pattern)}">${escapeHTML(entry.pattern)}</a>`;
+    li.innerHTML = `<a href="#" class="acu-pattern-link" data-cat="${escapeHTML(entry.cat)}" data-pattern="${escapeHTML(entry.pattern)}">${escapeHTML(display)}</a>`;
     relatedSymptomsEl.appendChild(li);
   });
 }
@@ -626,7 +622,8 @@ categorySelect.addEventListener('change', ()=>{
   if(!cat || !CLINICAL_DATA.cats[cat]){ requestAnimationFrame(equalizeTopCards); return; }
   CLINICAL_DATA.cats[cat].patternOrder.forEach(pat=>{
     const opt=document.createElement('option');
-    opt.value=pat; opt.textContent=pat;
+    opt.value=pat;           // 内部キー
+    opt.textContent=getDisplayPatternName(pat); // 表示は変換
     patternSelect.appendChild(opt);
   });
   patternSelect.disabled=false;
@@ -640,8 +637,10 @@ patternSelect.addEventListener('change', ()=>{
   clinicalGroupsEl.innerHTML='';
   if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]){ requestAnimationFrame(equalizeTopCards); return; }
   const groups=CLINICAL_DATA.cats[cat].patterns[pat];
+
+  // 見出し病証名表示
   const span=clinicalTitleEl.querySelector('.pattern-name-highlight');
-  if(span) span.textContent=pat;
+  if(span) span.textContent=getDisplayPatternName(pat);
 
   groups.forEach(g=>{
     const tokens=g.tokens || parseTreatmentPoints(g.rawPoints);
@@ -682,7 +681,6 @@ document.addEventListener('click', e=>{
   categorySelect.dispatchEvent(new Event('change'));
   patternSelect.value=pat;
   patternSelect.dispatchEvent(new Event('change'));
-  // scrollIntoView しない (iPad の自動スクロール抑止)
 });
 
 /* ==== ホームボタン ==== */
@@ -700,7 +698,6 @@ function goHome(){
   if(span) span.textContent='';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   window.scrollTo({top:0,behavior:'smooth'});
-  // フォーカス
   requestAnimationFrame(()=>{
     inputEl.focus();
     inputEl.select();
@@ -757,17 +754,15 @@ async function loadAcuCSV(){
     const nameCount={};
     parsed=parsed.map(p=>{
       nameCount[p.name]=(nameCount[p.name]||0)+1;
-      return {...p, id:nameCount[p.name]>1 ? `${p.name}__${nameCount[p.name]}`:p.name};
+      return {...p, id:nameCount[p.name]>1?`${p.name}__${nameCount[p.name]}`:p.name};
     });
     ACUPOINTS=parsed;
     buildNameLookup();
     DATA_READY=true;
     const total=ACUPOINTS.length;
-    if(total===EXPECTED_TOTAL){
-      statusEl.textContent=`経穴CSV: ${total}件`;
-    } else {
-      statusEl.textContent=`経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`;
-    }
+    statusEl.textContent = (total===EXPECTED_TOTAL)
+      ? `経穴CSV: ${total}件`
+      : `経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`;
   }catch(err){
     console.error(err);
     statusEl.textContent='経穴CSV: 失敗 '+err.message;
@@ -786,7 +781,8 @@ async function loadClinicalCSV(){
     categorySelect.innerHTML='<option value="">--</option>';
     CLINICAL_DATA.order.forEach(cat=>{
       const opt=document.createElement('option');
-      opt.value=cat; opt.textContent=cat;
+      opt.value=cat;
+      opt.textContent=cat; // カテゴリ名はそのまま
       categorySelect.appendChild(opt);
     });
     rebuildAcuPointPatternIndex();
@@ -807,7 +803,6 @@ window.addEventListener('resize', equalizeTopCards);
   loadAcuCSV();
   loadClinicalCSV();
   requestAnimationFrame(equalizeTopCards);
-  // 初期フォーカス & 全選択
   requestAnimationFrame(()=>{
     inputEl.focus();
     inputEl.select();
