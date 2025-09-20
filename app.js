@@ -1,14 +1,9 @@
 /******************************************************
  * 経穴検索 + 臨床病証二段選択 拡張版
- * - APP_VERSION 20250918-33
- * - 変更点:
- *   (1) 上段2カード（経穴検索 / 症状・病証）の高さをデスクトップ時に自動同期
- *   (2) サジェスト描画やクリア時にも再計算
- *   (3) モバイル(幅<860px)では高さ固定解除
- *   (4) 既存 v32 の 2カラムサジェスト仕様継承
+ * - APP_VERSION 20250918-36
+ * - 括弧内経穴リンク化 / プレースホルダ削除 / 青系統一
  ******************************************************/
-
-const APP_VERSION = '20250918-33';
+const APP_VERSION = '20250918-36';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
@@ -22,6 +17,9 @@ const READINGS   = window.ACU_READINGS   || {};
 const MUSCLE_MAP = window.ACU_MUSCLE_MAP || {};
 
 let ACUPOINTS = [];
+let ACUPOINT_NAME_LIST = [];
+let ACUPOINT_NAME_SET = new Set();
+
 let DATA_READY = false;
 let CLINICAL_DATA = { order: [], cats: {} };
 let CLINICAL_READY = false;
@@ -119,7 +117,7 @@ function parseAcuCSV(text){
   return out;
 }
 
-/* ==== トークン化 ==== */
+/* ==== tokens ==== */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
@@ -147,104 +145,118 @@ function findAcupointByToken(token){
   return ACUPOINTS.find(p=>p.name === key);
 }
 
-/* ==== 治療ポイント表示 ==== */
+/* ==== 括弧内リンク化支援 ==== */
+function buildNameLookup(){
+  ACUPOINT_NAME_LIST = ACUPOINTS.map(p=>p.name).sort((a,b)=> b.length - a.length);
+  ACUPOINT_NAME_SET = new Set(ACUPOINT_NAME_LIST);
+}
+function linkifyParenthesisGroup(group){
+  if(group.length<2) return escapeHTML(group);
+  const open = group[0];
+  const close = group[group.length-1];
+  const inner = group.slice(1, -1);
+  let i=0, out='';
+  while(i<inner.length){
+    let matched=null;
+    for(const name of ACUPOINT_NAME_LIST){
+      if(inner.startsWith(name,i)){
+        matched=name; break;
+      }
+    }
+    if(matched){
+      const p=findAcupointByToken(matched);
+      if(p){
+        const imp = p.important ? ' acu-important':'';
+        out += `<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`;
+      } else {
+        out += escapeHTML(matched);
+      }
+      i+=matched.length;
+    } else {
+      out += escapeHTML(inner[i]);
+      i++;
+    }
+  }
+  return escapeHTML(open)+out+escapeHTML(close);
+}
+
+/* ==== 治療ポイント HTML ==== */
 function buildPointsHTML(rawPoints, tokens){
   if(!rawPoints) return '';
-  if(!tokens || !tokens.length) return escapeHTML(rawPoints);
-
-  const uniqueTokens = Array.from(new Set(tokens));
+  const uniqueTokens = Array.from(new Set(tokens||[]));
   const sortedTokens = uniqueTokens.sort((a,b)=> b.length - a.length);
   const firstChars = new Set(sortedTokens.map(t=>t[0]));
 
-  let i = 0;
-  let out = '';
+  let i=0;
+  let out='';
   const len = rawPoints.length;
-
-  while(i < len){
+  while(i<len){
     const ch = rawPoints[i];
-
-    if(ch === '(' || ch === '（'){
-      const closeChar = ch === '(' ? ')' : '）';
-      let j = i + 1;
-      while(j < len && rawPoints[j] !== closeChar) j++;
-      if(j < len) j++;
-      const group = rawPoints.slice(i, j);
-      out += escapeHTML(group);
-      i = j;
+    if(ch==='(' || ch==='（'){
+      const closeChar = ch==='(' ? ')' : '）';
+      let j=i+1;
+      while(j<len && rawPoints[j]!==closeChar) j++;
+      if(j<len) j++;
+      const group = rawPoints.slice(i,j);
+      out += linkifyParenthesisGroup(group);
+      i=j;
       continue;
     }
-
-    if(!firstChars.has(ch)){
-      out += escapeHTML(ch);
-      i++;
-      continue;
-    }
-
-    let matched = null;
-    for(const tk of sortedTokens){
-      if(rawPoints.startsWith(tk, i)){
-        matched = tk; break;
+    if(sortedTokens.length && firstChars.has(ch)){
+      let matched=null;
+      for(const tk of sortedTokens){
+        if(rawPoints.startsWith(tk,i)){
+          matched=tk; break;
+        }
+      }
+      if(matched){
+        const p=findAcupointByToken(matched);
+        if(p){
+          const imp=p.important?' acu-important':'';
+          out += `<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`;
+        } else {
+          out += `<a href="#" class="treat-point-link treat-point-unknown" data-point="${escapeHTML(matched)}" data-unknown="1">${escapeHTML(matched)}</a>`;
+        }
+        i += matched.length;
+        continue;
       }
     }
-    if(!matched){
-      out += escapeHTML(ch);
-      i++;
-      continue;
-    }
-
-    const acu = findAcupointByToken(matched);
-    if(acu){
-      const importantClass = acu.important ? ' acu-important' : '';
-      out += `<a href="#" class="treat-point-link${importantClass}" data-point="${escapeHTML(acu.name)}">${escapeHTML(acu.name)}</a>`;
-    } else {
-      out += `<a href="#" class="treat-point-link treat-point-unknown" data-point="${escapeHTML(matched)}" data-unknown="1">${escapeHTML(matched)}</a>`;
-    }
-    i += matched.length;
+    out += escapeHTML(ch);
+    i++;
   }
   return out;
 }
 
-/* ==== Clinical CSV Parser ==== */
+/* ==== Clinical CSV Parser (既存) ==== */
 function rebuildLogicalRows(raw){
   const physical = raw.replace(/\r\n/g,'\n').split('\n');
-  const rows = [];
-  let buf = '';
-  let quotes = 0;
+  const rows=[]; let buf=''; let quotes=0;
   for(const line of physical){
-    if(buf) buf += '\n' + line; else buf = line;
-    quotes = (buf.match(/"/g)||[]).length;
-    if(quotes % 2 === 0){
-      rows.push(buf);
-      buf = '';
-      quotes = 0;
-    }
+    if(buf) buf+='\n'+line; else buf=line;
+    quotes=(buf.match(/"/g)||[]).length;
+    if(quotes%2===0){ rows.push(buf); buf=''; quotes=0; }
   }
   if(buf) rows.push(buf);
   return rows;
 }
 function parseCSVLogicalRow(row){
-  const cols = [];
-  let cur = '';
-  let inQ = false;
+  const cols=[]; let cur=''; let inQ=false;
   for(let i=0;i<row.length;i++){
-    const ch = row[i];
+    const ch=row[i];
     if(ch === '"'){
-      if(inQ && row[i+1] === '"'){ cur += '"'; i++; }
-      else inQ = !inQ;
+      if(inQ && row[i+1]==='"'){ cur+='"'; i++; }
+      else inQ=!inQ;
       continue;
     }
-    if(ch === ',' && !inQ){
-      cols.push(cur); cur='';
-    } else {
-      cur += ch;
-    }
+    if(ch===',' && !inQ){ cols.push(cur); cur=''; }
+    else cur+=ch;
   }
   cols.push(cur);
   return cols.map(c=>c.replace(/\uFEFF/g,'').replace(/\u00A0/g,' ').trim());
 }
 function isCategoryRow(cols){
   if(!cols.length) return false;
-  const c0 = removeAllUnicodeSpaces(cols[0]);
+  const c0=removeAllUnicodeSpaces(cols[0]);
   return /^[0-9０-９][0-9０-９-]*\./.test(c0) && cols.slice(1).every(c=>!c);
 }
 function isPatternHeaderRow(cols){
@@ -261,88 +273,70 @@ function isPotentialCommentRow(cols){
   return cols.slice(1).some(c=>/^[（(]/.test(c));
 }
 function dissectTreatmentCell(cell){
-  if(!cell) return { label:'', rawPoints:'', comment:'' };
-  const lines = cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
-  let comment = '';
-  if(lines.length && /^[（(]/.test(lines[lines.length-1])) comment = lines.pop();
-  let main = lines.join(' ');
-  if(!main) main = cell;
-  const tail = main.match(/([（(].*?[）)])\s*$/);
+  if(!cell) return {label:'',rawPoints:'',comment:''};
+  const lines=cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  let comment='';
+  if(lines.length && /^[（(]/.test(lines[lines.length-1])) comment=lines.pop();
+  let main=lines.join(' ');
+  if(!main) main=cell;
+  const tail=main.match(/([（(].*?[）)])\s*$/);
   if(tail){
-    comment = comment || tail[1];
-    main = main.slice(0, tail.index).trim();
+    comment=comment||tail[1];
+    main=main.slice(0,tail.index).trim();
   }
-  let label='', rawPoints='';
-  const p1 = main.indexOf('：');
-  const p2 = main.indexOf(':');
-  let sep = -1;
-  if(p1>=0 && p2>=0) sep = Math.min(p1,p2);
-  else sep = p1>=0 ? p1 : p2;
+  let label='',rawPoints='';
+  const p1=main.indexOf('：'); const p2=main.indexOf(':');
+  let sep=-1;
+  if(p1>=0 && p2>=0) sep=Math.min(p1,p2);
+  else sep=p1>=0? p1 : p2;
   if(sep>=0){
-    label = main.slice(0,sep).trim();
-    rawPoints = main.slice(sep+1).trim();
-  } else {
-    label = main.trim();
-  }
-  return { label, rawPoints, comment };
+    label=main.slice(0,sep).trim();
+    rawPoints=main.slice(sep+1).trim();
+  } else label=main.trim();
+  return {label,rawPoints,comment};
 }
-function isInterleavedTreatmentRow(rowAfterFirst, patternCount){
-  if(!rowAfterFirst.length) return false;
-  const treatCells = rowAfterFirst.filter(c => c && (c.includes('：')||c.includes(':')));
-  const commentCells = rowAfterFirst.filter(c => c && /^[（(]/.test(c));
-  if(commentCells.length === 0) return false;
-  if(treatCells.length === 0) return false;
-  return (treatCells.length + commentCells.length) >= patternCount;
+function isInterleavedTreatmentRow(after, patternCount){
+  if(!after.length) return false;
+  const treat=after.filter(c=>c && (c.includes('：')||c.includes(':')));
+  const comm=after.filter(c=>c && /^[（(]/.test(c));
+  if(!comm.length) return false;
+  if(!treat.length) return false;
+  return (treat.length+comm.length)>=patternCount;
 }
-function parseInterleavedRow(rowAfterFirst, patternNames){
-  const results = [];
-  let pIndex = 0;
-  let i=0;
-  while(i < rowAfterFirst.length && pIndex < patternNames.length){
-    while(i < rowAfterFirst.length &&
-          (!rowAfterFirst[i] ||
-           /^[（(]/.test(rowAfterFirst[i]) ||
-           !(rowAfterFirst[i].includes('：')||rowAfterFirst[i].includes(':')))){
-      i++;
-    }
-    if(i>=rowAfterFirst.length) break;
-    const treatCell = rowAfterFirst[i]; i++;
+function parseInterleavedRow(after, patternNames){
+  const results=[]; let pIndex=0; let i=0;
+  while(i<after.length && pIndex<patternNames.length){
+    while(i<after.length && (!after[i] || /^[（(]/.test(after[i]) || !(after[i].includes('：')||after[i].includes(':')))) i++;
+    if(i>=after.length) break;
+    const treatCell=after[i]; i++;
     let commentCell='';
-    if(i<rowAfterFirst.length && /^[（(]/.test(rowAfterFirst[i])){ commentCell=rowAfterFirst[i]; i++; }
-    const {label,rawPoints,comment} = dissectTreatmentCell(treatCell);
-    if(label || rawPoints){
-      results.push({
-        pattern: patternNames[pIndex],
-        label,
-        rawPoints,
-        comment: commentCell || comment || ''
-      });
+    if(i<after.length && /^[（(]/.test(after[i])){ commentCell=after[i]; i++; }
+    const {label,rawPoints,comment}=dissectTreatmentCell(treatCell);
+    if(label||rawPoints){
+      results.push({pattern:patternNames[pIndex],label,rawPoints,comment:commentCell||comment||''});
       pIndex++;
     }
   }
   return results;
 }
 function parseClinicalCSV(raw){
-  const logical = rebuildLogicalRows(raw);
-  const table = logical.map(parseCSVLogicalRow);
-  const data = { order: [], cats: {} };
+  const logical=rebuildLogicalRows(raw);
+  const table=logical.map(parseCSVLogicalRow);
+  const data={order:[],cats:{}};
   let i=0;
   while(i<table.length){
-    const row = table[i];
-    if(!row.length){ i++; continue; }
+    const row=table[i];
+    if(!row.length){ i++; continue;}
     if(isCategoryRow(row)){
-      const category = removeAllUnicodeSpaces(row[0]);
-      if(!data.cats[category]){
-        data.cats[category] = { patternOrder: [], patterns:{} };
-        data.order.push(category);
-      }
+      const category=removeAllUnicodeSpaces(row[0]);
+      if(!data.cats[category]){ data.cats[category]={patternOrder:[],patterns:{}}; data.order.push(category);}
       i++;
       if(i>=table.length) break;
       if(!isPatternHeaderRow(table[i])) continue;
-      const pRow = table[i];
+      const pRow=table[i];
       const patternNames=[];
       for(let c=1;c<pRow.length;c++){
-        const name = trimOuter(pRow[c]);
+        const name=trimOuter(pRow[c]);
         if(name){
           patternNames.push(name);
           if(!data.cats[category].patterns[name]){
@@ -353,43 +347,35 @@ function parseClinicalCSV(raw){
       }
       i++;
       while(i<table.length){
-        const r = table[i];
+        const r=table[i];
         if(isCategoryRow(r)) break;
-        if(isPatternHeaderRow(r)){ i++; continue; }
-        if(!isTreatmentRow(r)){ i++; continue; }
-        const afterFirst = r.slice(1);
-        const interleaved = isInterleavedTreatmentRow(afterFirst, patternNames.length);
-        if(interleaved){
-          const groups = parseInterleavedRow(afterFirst, patternNames);
+        if(isPatternHeaderRow(r)){ i++; continue;}
+        if(!isTreatmentRow(r)){ i++; continue;}
+        const after=r.slice(1);
+        const inter=isInterleavedTreatmentRow(after, patternNames.length);
+        if(inter){
+          const groups=parseInterleavedRow(after, patternNames);
           groups.forEach(g=>{
-            data.cats[category].patterns[g.pattern].push({
-              label:g.label,
-              rawPoints:g.rawPoints,
-              comment:g.comment
-            });
+            data.cats[category].patterns[g.pattern].push({label:g.label,rawPoints:g.rawPoints,comment:g.comment});
           });
           i++;
         } else {
-          const next = table[i+1] || [];
-          const commentRow = isPotentialCommentRow(next)? next : null;
-          patternNames.forEach((pName, idx)=>{
-            const col = idx+1;
-            const cell = r[col] || '';
+          const next=table[i+1]||[];
+          const commentRow=isPotentialCommentRow(next)? next : null;
+            patternNames.forEach((pName,idx)=>{
+            const col=idx+1;
+            const cell=r[col]||'';
             if(!cell) return;
-            const {label, rawPoints, comment} = dissectTreatmentCell(cell);
+            const {label,rawPoints,comment}=dissectTreatmentCell(cell);
             if(!label && !rawPoints) return;
-            let finalComment = comment;
+            let finalComment=comment;
             if(!finalComment && commentRow){
-              const cc = commentRow[col] || '';
-              if(/^[（(]/.test(cc)) finalComment = cc;
+              const cc=commentRow[col]||'';
+              if(/^[（(]/.test(cc)) finalComment=cc;
             }
-            data.cats[category].patterns[pName].push({
-              label,
-              rawPoints,
-              comment: finalComment
-            });
+            data.cats[category].patterns[pName].push({label,rawPoints,comment:finalComment});
           });
-          i += commentRow ? 2 : 1;
+          i += commentRow? 2:1;
         }
       }
       continue;
@@ -397,16 +383,14 @@ function parseClinicalCSV(raw){
     i++;
   }
   data.order.forEach(cat=>{
-    const catObj = data.cats[cat];
+    const catObj=data.cats[cat];
     catObj.patternOrder.forEach(pn=>{
       catObj.patterns[pn].forEach(g=>{
-        if(!g.tokens){
-          g.tokens = parseTreatmentPoints(g.rawPoints);
-        }
+        if(!g.tokens) g.tokens=parseTreatmentPoints(g.rawPoints);
       });
     });
   });
-  console.log('[ClinicalParser v33] Categories:', data.order);
+  console.log('[ClinicalParser v36]', data.order);
   return data;
 }
 
@@ -414,56 +398,54 @@ function parseClinicalCSV(raw){
 function rebuildAcuPointPatternIndex(){
   ACUPOINT_PATTERN_INDEX = {};
   CLINICAL_DATA.order.forEach(cat=>{
-    const catObj = CLINICAL_DATA.cats[cat];
+    const catObj=CLINICAL_DATA.cats[cat];
     catObj.patternOrder.forEach(pat=>{
-      const groups = catObj.patterns[pat];
-      const seenInPattern = new Set();
+      const groups=catObj.patterns[pat];
+      const seen=new Set();
       groups.forEach(g=>{
         (g.tokens||[]).forEach(tk=>{
           if(!tk) return;
-          if(seenInPattern.has(tk)) return;
-          seenInPattern.add(tk);
+          if(seen.has(tk)) return;
+          seen.add(tk);
           if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
-          ACUPOINT_PATTERN_INDEX[tk].push({cat, pattern:pat});
+          ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
       });
     });
   });
   Object.keys(ACUPOINT_PATTERN_INDEX).forEach(k=>{
-    const uniq = new Map();
+    const uniq=new Map();
     ACUPOINT_PATTERN_INDEX[k].forEach(e=>{
-      const key = e.cat+'||'+e.pattern;
+      const key=e.cat+'||'+e.pattern;
       if(!uniq.has(key)) uniq.set(key,e);
     });
-    ACUPOINT_PATTERN_INDEX[k] = Array.from(uniq.values());
+    ACUPOINT_PATTERN_INDEX[k]=Array.from(uniq.values());
   });
 }
 
 /* ==== 高さ同期 ==== */
 function equalizeTopCards(){
-  // モバイル幅では解除
-  if(window.innerWidth < 860){
-    searchCard.style.height = '';
-    symptomCard.style.height = '';
+  if(window.innerWidth<860){
+    searchCard.style.height='';
+    symptomCard.style.height='';
     return;
   }
-  // まずリセット
-  searchCard.style.height = '';
-  symptomCard.style.height = '';
-  const h1 = searchCard.scrollHeight;
-  const h2 = symptomCard.scrollHeight;
-  const maxH = Math.max(h1,h2);
-  searchCard.style.height  = maxH + 'px';
-  symptomCard.style.height = maxH + 'px';
+  searchCard.style.height='';
+  symptomCard.style.height='';
+  const h1=searchCard.scrollHeight;
+  const h2=symptomCard.scrollHeight;
+  const maxH=Math.max(h1,h2);
+  searchCard.style.height=maxH+'px';
+  symptomCard.style.height=maxH+'px';
 }
 
-/* ==== Suggestion/Search ==== */
+/* ==== 検索サジェスト ==== */
 function filterPoints(qInput){
-  const q = removeAllUnicodeSpaces(qInput);
+  const q=removeAllUnicodeSpaces(qInput);
   if(q.length < MIN_QUERY_LENGTH) return [];
   if(isHiraganaOnly(q)){
-    let list = ACUPOINTS.filter(p=>p.reading && p.reading.startsWith(q));
-    if(!list.length) list = ACUPOINTS.filter(p=>p.reading && p.reading.includes(q));
+    let list=ACUPOINTS.filter(p=>p.reading && p.reading.startsWith(q));
+    if(!list.length) list=ACUPOINTS.filter(p=>p.reading && p.reading.includes(q));
     return list.map(p=>({...p,_matchType:'name'}));
   }
   const nameMatches=[]; const seen=new Set();
@@ -482,7 +464,6 @@ function clearSuggestions(){
   suggestionListEl.innerHTML='';
   suggestionListEl.classList.add('hidden');
   inputEl.setAttribute('aria-expanded','false');
-  // 高さ再計算
   requestAnimationFrame(equalizeTopCards);
 }
 function setActive(items, idx){
@@ -498,43 +479,33 @@ function setActive(items, idx){
 }
 function renderSuggestions(list){
   suggestionListEl.innerHTML='';
-  const qRaw = removeAllUnicodeSpaces(inputEl.value);
-  const hiraQuery = isHiraganaOnly(qRaw) ? qRaw : '';
-  const qRegex = hiraQuery
-    ? new RegExp(hiraQuery.replace(/([.*+?^=!:${}()|[\]\\])/g,'\\$1'),'g')
-    : null;
+  const qRaw=removeAllUnicodeSpaces(inputEl.value);
+  const hiraQuery=isHiraganaOnly(qRaw)? qRaw : '';
+  const qRegex = hiraQuery ? new RegExp(hiraQuery.replace(/([.*+?^=!:${}()|[\\]\\])/g,'\\$1'),'g') : null;
 
   list.slice(0,120).forEach((p,i)=>{
-    const li = document.createElement('li');
-    li.dataset.id = p.id;
-    if(p._matchType) li.dataset.matchType = p._matchType;
+    const li=document.createElement('li');
+    li.dataset.id=p.id;
+    if(p._matchType) li.dataset.matchType=p._matchType;
     li.setAttribute('role','option');
-    li.setAttribute('aria-selected', i===0 ? 'true':'false');
+    li.setAttribute('aria-selected', i===0?'true':'false');
 
-    let readingHTML = escapeHTML(p.reading || '');
+    let readingHTML=escapeHTML(p.reading||'');
     if(qRegex && p.reading){
-      readingHTML = readingHTML.replace(qRegex, m=>`<mark>${m}</mark>`);
+      readingHTML=readingHTML.replace(qRegex,m=>`<mark>${m}</mark>`);
     }
-
-    const important = !!p.important;
-    const nameClass = important ? 'sug-name important' : 'sug-name';
-
-    const badges = [];
-    if(important){
-      badges.push('<span class="badge badge-important" title="要穴">★</span>');
-    }
-    if(p._matchType === 'muscle'){
-      badges.push('<span class="badge badge-muscle" title="筋肉で一致">M</span>');
-    }
-
-    li.innerHTML = `
+    const important=!!p.important;
+    const nameClass=important?'sug-name important':'sug-name';
+    const badges=[];
+    if(important) badges.push('<span class="badge badge-important" title="要穴">★</span>');
+    if(p._matchType==='muscle') badges.push('<span class="badge badge-muscle" title="筋肉で一致">M</span>');
+    li.innerHTML=`
       <span class="${nameClass}">${escapeHTML(p.name)}</span>
       <span class="sug-slash">/</span>
       <span class="sug-reading">${readingHTML}</span>
-      <span class="sug-badges">${badges.join('')}</span>
-    `;
+      <span class="sug-badges">${badges.join('')}</span>`;
     if(i===0) li.classList.add('active');
-    li.addEventListener('click', ()=> selectPoint(p));
+    li.addEventListener('click',()=>selectPoint(p));
     suggestionListEl.appendChild(li);
   });
 
@@ -546,19 +517,16 @@ function renderSuggestions(list){
     li.setAttribute('aria-selected','false');
     suggestionListEl.appendChild(li);
   }
-
   suggestionListEl.classList.remove('hidden');
   inputEl.setAttribute('aria-expanded','true');
-
-  // サジェスト描画後に高さ再計算
   requestAnimationFrame(equalizeTopCards);
 }
 function handleSuggestionKeyboard(e){
-  const items = Array.from(suggestionListEl.querySelectorAll('li'));
+  const items=Array.from(suggestionListEl.querySelectorAll('li'));
   if(!items.length) return;
-  let current = items.findIndex(li=>li.classList.contains('active'));
-  if(e.key==='ArrowDown'){ e.preventDefault(); current=(current+1)%items.length; setActive(items,current); }
-  else if(e.key==='ArrowUp'){ e.preventDefault(); current=(current-1+items.length)%items.length; setActive(items,current); }
+  let current=items.findIndex(li=>li.classList.contains('active'));
+  if(e.key==='ArrowDown'){ e.preventDefault(); current=(current+1)%items.length; setActive(items,current);}
+  else if(e.key==='ArrowUp'){ e.preventDefault(); current=(current-1+items.length)%items.length; setActive(items,current);}
   else if(e.key==='Enter'){
     e.preventDefault();
     const act=items[current>=0?current:0];
@@ -569,16 +537,14 @@ function handleSuggestionKeyboard(e){
   } else if(e.key==='Escape'){ clearSuggestions(); }
 }
 
-/* ==== 経穴詳細 ==== */
+/* ==== 詳細表示 ==== */
 function showPointDetail(p){
   resultNameEl.textContent = `${p.name}${p.reading?` (${p.reading})`:''}`;
   resultMeridianEl.textContent = p.meridian || '（経絡未登録）';
   resultRegionEl.innerHTML = p.region || '（部位未登録）';
   if(p.important){
     resultImportantEl.innerHTML = `<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
-  } else {
-    resultImportantEl.textContent='-';
-  }
+  } else resultImportantEl.textContent='-';
   resultMuscleEl.textContent = p.muscle || '（筋肉未登録）';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
@@ -605,19 +571,19 @@ function showUnknownPoint(name){
 }
 function selectPoint(p){
   clearSuggestions();
-  inputEl.value = p.name;
+  inputEl.value=p.name;
   showPointDetail(p);
   requestAnimationFrame(equalizeTopCards);
 }
 
-/* ==== 臨床 UI ==== */
+/* ==== 臨床UI ==== */
 categorySelect.addEventListener('change', ()=>{
-  const cat = categorySelect.value;
+  const cat=categorySelect.value;
   patternSelect.innerHTML='<option value="">--</option>';
   patternSelect.disabled=true;
   clinicalResultEl.classList.add('hidden');
   clinicalGroupsEl.innerHTML='';
-  if(!cat || !CLINICAL_DATA.cats[cat]) { requestAnimationFrame(equalizeTopCards); return; }
+  if(!cat || !CLINICAL_DATA.cats[cat]){ requestAnimationFrame(equalizeTopCards); return; }
   CLINICAL_DATA.cats[cat].patternOrder.forEach(pat=>{
     const opt=document.createElement('option');
     opt.value=pat; opt.textContent=pat;
@@ -628,25 +594,24 @@ categorySelect.addEventListener('change', ()=>{
 });
 
 patternSelect.addEventListener('change', ()=>{
-  const cat = categorySelect.value;
-  const pat = patternSelect.value;
+  const cat=categorySelect.value;
+  const pat=patternSelect.value;
   clinicalResultEl.classList.add('hidden');
   clinicalGroupsEl.innerHTML='';
-  if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]) { requestAnimationFrame(equalizeTopCards); return; }
-  const groups = CLINICAL_DATA.cats[cat].patterns[pat];
-
-  clinicalTitleEl.innerHTML = `治療方針(治法)：<span class="pattern-name-highlight">${escapeHTML(pat)}</span>`;
+  if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]){ requestAnimationFrame(equalizeTopCards); return; }
+  const groups=CLINICAL_DATA.cats[cat].patterns[pat];
+  // 上部病証名（青表示）
+  clinicalTitleEl.querySelector('.pattern-name-highlight').textContent = pat;
 
   groups.forEach(g=>{
     const tokens = g.tokens || parseTreatmentPoints(g.rawPoints);
     const pointsHtml = buildPointsHTML(g.rawPoints, tokens);
     const comment = g.comment ? ensureCommentParens(g.comment) : '';
-    const div = document.createElement('div');
+    const div=document.createElement('div');
     div.className='treat-line';
     div.innerHTML = `
       <p class="treat-main">${escapeHTML(g.label)}：${pointsHtml}</p>
-      ${comment ? `<p class="treat-comment">${escapeHTML(comment)}</p>` : ''}
-    `;
+      ${comment ? `<p class="treat-comment">${escapeHTML(comment)}</p>` : ''}`;
     clinicalGroupsEl.appendChild(div);
   });
 
@@ -664,9 +629,9 @@ patternSelect.addEventListener('change', ()=>{
   requestAnimationFrame(equalizeTopCards);
 });
 
-/* ==== 病証リンク ==== */
+/* ==== 病証リンク (右側 → 左治療へ) ==== */
 document.addEventListener('click', e=>{
-  const a = e.target.closest('.acu-pattern-link');
+  const a=e.target.closest('.acu-pattern-link');
   if(!a) return;
   e.preventDefault();
   const cat=a.dataset.cat;
@@ -692,7 +657,7 @@ function runSearch(){
 }
 
 /* ==== 入力イベント ==== */
-inputEl.addEventListener('keyup',e=>{
+inputEl.addEventListener('keyup', e=>{
   if(['ArrowDown','ArrowUp','Enter','Escape'].includes(e.key)){
     handleSuggestionKeyboard(e); return;
   }
@@ -703,25 +668,25 @@ inputEl.addEventListener('keyup',e=>{
   }
   renderSuggestions(filterPoints(val));
 });
-inputEl.addEventListener('keydown',e=>{
+inputEl.addEventListener('keydown', e=>{
   if(e.key==='Enter'){ e.preventDefault(); runSearch(); }
   else if(['ArrowDown','ArrowUp','Escape'].includes(e.key)){
     handleSuggestionKeyboard(e);
   }
 });
 searchBtn.addEventListener('click', runSearch);
-document.addEventListener('click',e=>{
+document.addEventListener('click', e=>{
   if(!e.target.closest('.suggestion-wrapper') &&
      !e.target.closest('#acupoint-search-input')){
     clearSuggestions();
   }
 });
 
-/* ==== データ読込 ==== */
+/* ==== データ読み込み ==== */
 async function loadAcuCSV(){
   try{
     statusEl.textContent='経穴CSV: 読込中';
-    const res = await fetch(`${CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
+    const res=await fetch(`${CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const text=await res.text();
     let parsed=parseAcuCSV(text);
@@ -731,10 +696,10 @@ async function loadAcuCSV(){
       return {...p, id: nameCount[p.name]>1 ? `${p.name}__${nameCount[p.name]}`:p.name};
     });
     ACUPOINTS=parsed;
+    buildNameLookup();
     DATA_READY=true;
     const total=ACUPOINTS.length;
-    const okMark = total===EXPECTED_TOTAL ? '正常' : `想定${EXPECTED_TOTAL}`;
-    statusEl.textContent=`経穴CSV: ${total}件 (${okMark})`;
+    statusEl.textContent=`経穴CSV: ${total}件 (${total===EXPECTED_TOTAL?'正常':`想定${EXPECTED_TOTAL}`})`;
   }catch(err){
     console.error(err);
     statusEl.textContent='経穴CSV: 失敗 '+err.message;
@@ -745,21 +710,18 @@ async function loadAcuCSV(){
 async function loadClinicalCSV(){
   try{
     clinicalStatusEl.textContent='臨床CSV: 読込中';
-    const res = await fetch(`${CLINICAL_CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
+    const res=await fetch(`${CLINICAL_CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const text=await res.text();
     CLINICAL_DATA=parseClinicalCSV(text);
     CLINICAL_READY=true;
-
     categorySelect.innerHTML='<option value="">--</option>';
     CLINICAL_DATA.order.forEach(cat=>{
       const opt=document.createElement('option');
       opt.value=cat; opt.textContent=cat;
       categorySelect.appendChild(opt);
     });
-
     rebuildAcuPointPatternIndex();
-
     clinicalStatusEl.textContent=`臨床CSV: ${CLINICAL_DATA.order.length}カテゴリ`;
   }catch(err){
     console.error(err);
@@ -769,15 +731,12 @@ async function loadClinicalCSV(){
   }
 }
 
-/* ==== リサイズ監視 ==== */
-window.addEventListener('resize', ()=>{
-  equalizeTopCards();
-});
+/* ==== リサイズ ==== */
+window.addEventListener('resize', equalizeTopCards);
 
 /* ==== 初期化 ==== */
 (function init(){
   loadAcuCSV();
   loadClinicalCSV();
-  // 初期高さ（データ未読込でも差が少ないうちに設定）
   requestAnimationFrame(equalizeTopCards);
 })();
