@@ -57,22 +57,10 @@
     padding:0;
     transition:background-color .18s,border-color .18s,transform .2s;
   }
-  #home-btn:hover {
-    background:var(--home-hover-bg);
-    border-color:#fff;
-  }
-  #home-btn:active {
-    transform:scale(.95);
-  }
-  #home-btn:focus-visible {
-    outline:2px solid #fff;
-    outline-offset:2px;
-  }
-  #home-btn svg {
-    width:18px;
-    height:18px;
-    fill:currentColor;
-  }
+  #home-btn:hover { background:var(--home-hover-bg); border-color:#fff; }
+  #home-btn:active { transform:scale(.95); }
+  #home-btn:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  #home-btn svg { width:18px; height:18px; fill:currentColor; }
 
   main { padding:12px 16px 48px; }
 
@@ -208,24 +196,12 @@
     position:relative;
     font-variant-east-asian: full-width;
   }
-  #acupoint-suggestion-list li:not(:last-child){
-    border-bottom:1px solid #eef1f4;
-  }
-  #acupoint-suggestion-list li .sug-name {
-    font-weight:600;
-    color:#222;
-    white-space:nowrap;
-  }
-  #acupoint-suggestion-list li .sug-name.important {
-    color:var(--important-red);
-  }
+  #acupoint-suggestion-list li:not(:last-child){ border-bottom:1px solid #eef1f4; }
+  #acupoint-suggestion-list li .sug-name { font-weight:600; color:#222; white-space:nowrap; }
+  #acupoint-suggestion-list li .sug-name.important { color:var(--important-red); }
   #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; font-weight:400; }
-  #acupoint-suggestion-list li .sug-reading {
-    color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  #acupoint-suggestion-list li mark {
-    background:#fff4c2; color:#222; padding:0 2px; border-radius:3px;
-  }
+  #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #acupoint-suggestion-list li mark { background:#fff4c2; color:#222; padding:0 2px; border-radius:3px; }
   #acupoint-suggestion-list li .sug-badges { display:flex; gap:4px; align-items:center; }
   #acupoint-suggestion-list li .badge {
     display:inline-block;
@@ -353,7 +329,7 @@
         <input
           id="acupoint-search-input"
           type="text"
-          placeholder="経穴名（漢字 / ひらがな）または筋肉名"
+          placeholder="経穴名(漢字/ひらがな)/筋肉名"
           autocomplete="off"
           aria-autocomplete="list"
           aria-haspopup="listbox"
@@ -404,6 +380,6 @@
 
 <script src="readings.js?v=20250918-14"></script>
 <script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-38"></script>
+<script src="app.js?v=20250918-39"></script>
 </body>
 </html>
