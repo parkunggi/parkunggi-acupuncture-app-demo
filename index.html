@@ -5,6 +5,7 @@
 <title>パク経穴検索ver_240920</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-store">
+<!-- スタイルは v40 から変更なし -->
 <style>
   :root {
     --box-bg:#fff;
@@ -21,42 +22,10 @@
     --home-hover-bg:#124f9f;
   }
   * { box-sizing:border-box; }
-  body {
-    margin:0;
-    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-    line-height:1.45;
-    background:#f5f7fa;
-    color:#222;
-  }
-  header {
-    padding:6px 12px;
-    background:#0d6efd;
-    color:#fff;
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  header h1 {
-    margin:0;
-    font-size:1.05rem;
-    font-weight:600;
-    letter-spacing:.03em;
-    line-height:1.2;
-  }
-  #home-btn {
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    width:34px;
-    height:34px;
-    border:1px solid rgba(255,255,255,.65);
-    background:rgba(255,255,255,.12);
-    color:#fff;
-    border-radius:8px;
-    cursor:pointer;
-    padding:0;
-    transition:background-color .18s,border-color .18s,transform .2s;
-  }
+  body { margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; line-height:1.45; background:#f5f7fa; color:#222; }
+  header { padding:6px 12px; background:#0d6efd; color:#fff; display:flex; align-items:center; gap:10px; }
+  header h1 { margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.03em; line-height:1.2; }
+  #home-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border:1px solid rgba(255,255,255,.65); background:rgba(255,255,255,.12); color:#fff; border-radius:8px; cursor:pointer; padding:0; transition:background-color .18s,border-color .18s,transform .2s; }
   #home-btn:hover { background:var(--home-hover-bg); border-color:#fff; }
   #home-btn:active { transform:scale(.95); }
   #home-btn:focus-visible { outline:2px solid #fff; outline-offset:2px; }
@@ -64,137 +33,53 @@
 
   main { padding:12px 16px 48px; }
 
-  #main-screen {
-    display:grid;
-    grid-template-columns: minmax(0,1fr) var(--right-col-width);
-    gap:var(--gap);
-    align-items:start;
-  }
+  #main-screen { display:grid; grid-template-columns:minmax(0,1fr) var(--right-col-width); gap:var(--gap); align-items:start; }
+  .left-inner { display:grid; gap:var(--gap); grid-template-columns:1fr 1fr; grid-template-areas:"search symptoms" "treatment treatment"; align-items:start; }
+  .search-container{grid-area:search;} .selection-container{grid-area:symptoms;} .clinical-result{grid-area:treatment;}
 
-  .left-inner {
-    display:grid;
-    gap:var(--gap);
-    grid-template-columns:1fr 1fr;
-    grid-template-areas:
-      "search symptoms"
-      "treatment treatment";
-    align-items:start;
+  .search-container, .selection-container, .clinical-result, .result-layout {
+    background:var(--box-bg); border:1px solid var(--box-border); border-radius:var(--radius); padding:12px 14px 14px;
   }
-  .search-container       { grid-area:search; }
-  .selection-container    { grid-area:symptoms; }
-  .clinical-result        { grid-area:treatment; }
-
-  .search-container,
-  .selection-container,
-  .clinical-result,
-  .result-layout {
-    background:var(--box-bg);
-    border:1px solid var(--box-border);
-    border-radius:var(--radius);
-    padding:12px 14px 14px;
-  }
-  .search-container h2,
-  .selection-container h2,
-  .clinical-result h2,
-  .result-layout h2 {
-    margin:0 0 8px;
-    font-size:.95rem;
-    font-weight:600;
+  .search-container h2, .selection-container h2, .clinical-result h2, .result-layout h2 {
+    margin:0 0 8px; font-size:.95rem; font-weight:600;
   }
 
   #inline-acupoint-result {
-    position:sticky;
-    top:10px;
-    max-height:calc(100vh - 24px);
-    overflow:auto;
-    scrollbar-width:thin;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
+    position:sticky; top:10px; max-height:calc(100vh - 24px); overflow:auto; scrollbar-width:thin;
+    display:flex; flex-direction:column; gap:10px;
   }
 
-  .info-container h3 {
-    font-size:.7rem;
-    margin:10px 0 3px;
-    letter-spacing:.05em;
-    color:#555;
-  }
-  .info-container p,
-  .info-container ul {
-    margin:0;
-    font-size:.75rem;
-    line-height:1.3;
-    padding:0;
-    list-style:disc inside;
-  }
+  .info-container h3 { font-size:.7rem; margin:10px 0 3px; letter-spacing:.05em; color:#555; }
+  .info-container p, .info-container ul { margin:0; font-size:.75rem; line-height:1.3; padding:0; list-style:disc inside; }
   #related-symptoms { list-style:none; padding-left:0; margin:0; }
   .info-container ul li { margin:0 0 3px; }
 
   .acu-important-flag {
-    display:inline-block;
-    background:#ffe0dc;
-    color:var(--important-red);
-    padding:2px 8px 2px;
-    font-size:.68rem;
-    border-radius:999px;
-    font-weight:700;
-    letter-spacing:.5px;
+    display:inline-block; background:#ffe0dc; color:var(--important-red);
+    padding:2px 8px 2px; font-size:.68rem; border-radius:999px; font-weight:700; letter-spacing:.5px;
   }
 
-  #result-name {
-    color:var(--brand-blue);
-    font-weight:700;
-    letter-spacing:.5px;
-  }
+  #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
 
   #acupoint-search-input {
-    width:100%;
-    padding:7px 9px;
-    font-size:.9rem;
-    border:1px solid #c3ccd4;
-    border-radius:6px;
-    background:#fff;
+    width:100%; padding:7px 9px; font-size:.9rem; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
   }
-  #acupoint-search-input:focus {
-    outline:2px solid #0d6efd55;
-    border-color:#0d6efd;
-  }
+  #acupoint-search-input:focus { outline:2px solid #0d6efd55; border-color:#0d6efd; }
   #search-btn {
-    margin-top:8px;
-    padding:6px 14px;
-    font-size:.8rem;
-    border:1px solid #0d6efd;
-    background:#0d6efd;
-    color:#fff;
-    border-radius:20px;
-    cursor:pointer;
+    margin-top:8px; padding:6px 14px; font-size:.8rem; border:1px solid #0d6efd; background:#0d6efd; color:#fff;
+    border-radius:20px; cursor:pointer;
   }
   #search-btn:hover { background:#0b5ed7; }
 
   .suggestion-wrapper { position:relative; }
   #acupoint-suggestion-list {
-    margin:6px 0 0;
-    padding:0;
-    list-style:none;
-    border:1px solid #c3ccd4;
-    border-radius:6px;
-    background:#fff;
-    max-height:260px;
-    overflow:auto;
-    font-size:.8rem;
-    box-shadow:0 4px 10px rgba(0,0,0,.08);
+    margin:6px 0 0; padding:0; list-style:none; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
+    max-height:260px; overflow:auto; font-size:.8rem; box-shadow:0 4px 10px rgba(0,0,0,.08);
   }
   #acupoint-suggestion-list.hidden { display:none; }
   #acupoint-suggestion-list li {
-    display:grid;
-    grid-template-columns:auto 10px 1fr auto;
-    align-items:baseline;
-    column-gap:8px;
-    padding:6px 10px 5px;
-    line-height:1.25;
-    cursor:pointer;
-    position:relative;
-    font-variant-east-asian: full-width;
+    display:grid; grid-template-columns:auto 10px 1fr auto; align-items:baseline; column-gap:8px;
+    padding:6px 10px 5px; line-height:1.25; cursor:pointer; position:relative; font-variant-east-asian:full-width;
   }
   #acupoint-suggestion-list li:not(:last-child){ border-bottom:1px solid #eef1f4; }
   #acupoint-suggestion-list li .sug-name { font-weight:600; color:#222; white-space:nowrap; }
@@ -203,112 +88,56 @@
   #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #acupoint-suggestion-list li mark { background:#fff4c2; color:#222; padding:0 2px; border-radius:3px; }
   #acupoint-suggestion-list li .sug-badges { display:flex; gap:4px; align-items:center; }
-  #acupoint-suggestion-list li .badge {
-    display:inline-block;
-    padding:2px 6px 1px;
-    font-size:.55rem;
-    line-height:1;
-    border-radius:var(--badge-radius);
-    font-weight:600;
-    letter-spacing:.5px;
-  }
+  #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; line-height:1; border-radius:var(--badge-radius); font-weight:600; letter-spacing:.5px; }
   .badge-important { background:#ffe0dc; color:#c40000; }
   .badge-muscle { background:#e9f8ef; color:#1d7f34; }
-  #acupoint-suggestion-list li.active,
-  #acupoint-suggestion-list li:hover {
-    background:var(--suggestion-active-bg);
-    color:var(--suggestion-active-fg);
+  #acupoint-suggestion-list li.active, #acupoint-suggestion-list li:hover {
+    background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
   }
-  #acupoint-suggestion-list li.active .sug-name,
-  #acupoint-suggestion-list li:hover .sug-name { color:var(--suggestion-active-fg); }
-  #acupoint-suggestion-list li.active .sug-name.important,
-  #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
-  #acupoint-suggestion-list li.active .sug-reading,
-  #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
-  #acupoint-suggestion-list li.active mark,
-  #acupoint-suggestion-list li:hover mark { background:#084c9d; color:#fff; }
-  #acupoint-suggestion-list li.active .badge-important,
-  #acupoint-suggestion-list li:hover .badge-important { background:#ffb6aa; color:#6b0000; }
-  #acupoint-suggestion-list li.active .badge-muscle,
-  #acupoint-suggestion-list li:hover .badge-muscle { background:#a9e6bd; color:#063d18; }
+  #acupoint-suggestion-list li.active .sug-name, #acupoint-suggestion-list li:hover .sug-name { color:var(--suggestion-active-fg); }
+  #acupoint-suggestion-list li.active .sug-name.important, #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
+  #acupoint-suggestion-list li.active .sug-reading, #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
+  #acupoint-suggestion-list li.active mark, #acupoint-suggestion-list li:hover mark { background:#084c9d; color:#fff; }
+  #acupoint-suggestion-list li.active .badge-important, #acupoint-suggestion-list li:hover .badge-important { background:#ffb6aa; color:#6b0000; }
+  #acupoint-suggestion-list li.active .badge-muscle, #acupoint-suggestion-list li:hover .badge-muscle { background:#a9e6bd; color:#063d18; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
-  .treat-main a,
-  .acu-pattern-link {
-    font-size:.74rem;
-    text-decoration:none;
-    color:var(--brand-blue);
-    font-weight:600;
-    border-bottom:1px solid rgba(11,77,156,.35);
-    padding:0 1px;
-    transition:color .15s, border-color .15s, background-color .15s;
+  .treat-main a, .acu-pattern-link {
+    font-size:.74rem; text-decoration:none; color:var(--brand-blue); font-weight:600;
+    border-bottom:1px solid rgba(11,77,156,.35); padding:0 1px; transition:color .15s, border-color .15s, background-color .15s;
   }
-  .treat-main a:hover,
-  .acu-pattern-link:hover {
-    color:var(--brand-blue-dark);
-    border-color:var(--brand-blue-dark);
-    background:rgba(11,77,156,.08);
-    border-radius:3px;
+  .treat-main a:hover, .acu-pattern-link:hover {
+    color:var(--brand-blue-dark); border-color:var(--brand-blue-dark); background:rgba(11,77,156,.08); border-radius:3px;
   }
   .treat-main a.acu-important {
-    color:var(--important-red);
-    font-weight:700;
-    border-bottom:1px solid var(--important-red);
+    color:var(--important-red); font-weight:700; border-bottom:1px solid var(--important-red);
   }
   .treat-main a.acu-important:hover {
-    color:#ff2a2a;
-    border-color:#ff2a2a;
+    color:#ff2a2a; border-color:#ff2a2a;
     background:linear-gradient(90deg,rgba(196,0,0,.08),rgba(196,0,0,.03));
   }
 
-  .pattern-name-highlight {
-    color:var(--brand-blue);
-    font-weight:700;
-    letter-spacing:.5px;
-  }
+  .pattern-name-highlight { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
 
   .treat-line { margin:0 0 8px; }
   .treat-main { margin:0 0 2px; font-size:.72rem; line-height:1.4; }
   .treat-comment { margin:0 0 4px; font-size:.63rem; color:#555; }
-
   .hidden { display:none !important; }
 
   #status-float {
-    position:fixed;
-    right:10px;
-    bottom:10px;
-    background:rgba(0,0,0,.55);
-    color:#fff;
-    font-size:10px;
-    padding:7px 10px 6px;
-    border-radius:8px;
-    backdrop-filter:blur(4px);
-    z-index:999;
-    line-height:1.2;
-    max-width:230px;
+    position:fixed; right:10px; bottom:10px; background:rgba(0,0,0,.55); color:#fff;
+    font-size:10px; padding:7px 10px 6px; border-radius:8px; backdrop-filter:blur(4px);
+    z-index:999; line-height:1.2; max-width:230px;
   }
   #status-float span { display:block; margin:0 0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #status-float span:last-child { margin-bottom:0; }
 
   @media (max-width:860px) {
     #main-screen { grid-template-columns:1fr; }
-    .left-inner {
-      grid-template-columns:1fr;
-      grid-template-areas:
-        "search"
-        "symptoms"
-        "treatment";
-    }
-    #inline-acupoint-result {
-      position:static;
-      max-height:none;
-      order:4;
-      margin-top:var(--gap);
-    }
-    #acupoint-suggestion-list li {
-      grid-template-columns:auto 8px 1fr auto;
-    }
+    .left-inner { grid-template-columns:1fr; grid-template-areas:"search" "symptoms" "treatment"; }
+    #inline-acupoint-result { position:static; max-height:none; order:4; margin-top:var(--gap); }
+    #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
   }
 </style>
 </head>
@@ -316,9 +145,7 @@
 <header>
   <h1>パク経穴検索ver_240920</h1>
   <button id="home-btn" type="button" aria-label="ホーム (初期画面へ戻る)" title="ホーム">
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/>
-    </svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
   </button>
 </header>
 <main>
@@ -380,6 +207,6 @@
 
 <script src="readings.js?v=20250918-14"></script>
 <script src="muscle-map.js?v=20250918-14"></script>
-<script src="app.js?v=20250918-39"></script>
+<script src="app.js?v=20250918-41"></script>
 </body>
 </html>
