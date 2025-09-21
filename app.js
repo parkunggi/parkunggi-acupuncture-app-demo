@@ -1,13 +1,14 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX
  *
- * 追加/変更点 (今回のみ):
- *  - レイアウト入替: 経穴結果(#inline-acupoint-result)を左、治療方針(#clinical-treatment-result)を右 sticky
- *  - equalizeTopCards に治療方針パネル高さ調整処理を追加
- *  - 既存ロジックは基本維持
+ * 今回追加修正（最小）:
+ *  1) equalizeTopCards: 治療方針パネル高さを検索カード高さに合わせるよう変更
+ *  2) applyState('pattern') で検索結果パネルを必ず非表示にし
+ *     「point -> pattern」履歴戻り時に検索結果が残る不具合を解消
+ * 他のロジックは変更なし
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -101,7 +102,9 @@ function applyState(state){
   IS_APPLYING_HISTORY=true;
   try{
     switch(state.type){
-      case 'home': goHome(true); break;
+      case 'home':
+        goHome(true);
+        break;
       case 'point': {
         const p=ACUPOINTS.find(x=>x.name===state.name);
         if(p) showPointDetail(p,true); else showUnknownPoint(state.name,true);
@@ -111,6 +114,8 @@ function applyState(state){
         showUnknownPoint(state.name,true);
         break;
       case 'pattern':
+        // パターン表示時は検索結果パネルを必ず閉じる（履歴戻り異常対策）
+        inlineAcupointResult.classList.add('hidden');
         if(CLINICAL_READY){
           if(state.cat){
             categorySelect.value=state.cat;
@@ -126,6 +131,7 @@ function applyState(state){
   } finally {
     IS_APPLYING_HISTORY=false;
     updateNavButtons();
+    requestAnimationFrame(equalizeTopCards);
   }
 }
 function goBack(){
@@ -546,7 +552,6 @@ function rebuildAcuPointPatternIndex(){
 
 /* ================= 表示補助 ================= */
 function equalizeTopCards(){
-  // 左2カードの高さ調整（既存）
   if(window.innerWidth<860){
     searchCard.style.height='';
     symptomCard.style.height='';
@@ -559,11 +564,9 @@ function equalizeTopCards(){
   searchCard.style.height=maxH+'px';
   symptomCard.style.height=maxH+'px';
 
-  // 右側 sticky 治療方針パネルの高さを検索+症状合計に合わせる（表示時）
   if(!clinicalResultEl.classList.contains('hidden')){
-    const gap = 12; // CSS --gap
-    const total = searchCard.offsetHeight + gap + symptomCard.offsetHeight;
-    clinicalResultEl.style.height = total+'px';
+    // 修正: 検索カードの高さに合わせる
+    clinicalResultEl.style.height = searchCard.offsetHeight + 'px';
   } else {
     clinicalResultEl.style.height='';
   }
@@ -602,7 +605,7 @@ function setActive(items, idx){
   });
   if(items[idx]){
     items[idx].classList.add('active');
-    items[idx].setAttribute('aria-selected','true');
+    li.setAttribute('aria-selected','true');
     items[idx].scrollIntoView({block:'nearest'});
   }
 }
