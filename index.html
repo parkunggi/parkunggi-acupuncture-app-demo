@@ -5,6 +5,7 @@
 <title>パク経穴検索 ver_240920</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-store">
+<link rel="icon" href="favicon.ico">
 <style>
   :root {
     --box-bg:#fff; --box-border:#d4dae0; --radius:8px;
@@ -155,7 +156,6 @@
   }
 </style>
 
-<!-- RED FIX -->
 <style id="bui-red-fix">
   #result-region .bui-red,
   #result-region .bui-red * {
@@ -170,7 +170,7 @@
     <button id="back-btn" class="nav-btn" type="button" aria-label="戻る" title="戻る (Alt+←)">
       <svg viewBox="0 0 24 24"><path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11l4.3 4.3a1 1 0 0 1-1.42 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.42 0z"/></svg>
     </button>
-    <button id="home-btn" class="nav-btn" type="button" aria-label="ホーム (初期画面へ戻る)" title="ホーム">
+    <button id="home-btn" class="nav-btn" type="button" aria-label="ホーム" title="ホーム">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
     </button>
     <button id="forward-btn" class="nav-btn" type="button" aria-label="進む" title="進む (Alt+→)">
@@ -184,15 +184,11 @@
     <div class="left-inner">
       <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
-        <input
-          id="acupoint-search-input"
-            type="text"
-            placeholder="経穴名(漢字/ひらがな)/筋肉名/神経名/血管名"
-            autocomplete="off"
-            aria-autocomplete="list"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-owns="acupoint-suggestion-list">
+        <input id="acupoint-search-input" type="text"
+               placeholder="経穴名(漢字/ひらがな)/筋肉名/神経名/血管名"
+               autocomplete="off" aria-autocomplete="list"
+               aria-haspopup="listbox" aria-expanded="false"
+               aria-owns="acupoint-suggestion-list">
         <div class="suggestion-wrapper">
           <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
         </div>
@@ -238,10 +234,10 @@
   </div>
 </main>
 
-<script src="readings.js?v=20250921-navlink"></script>
-<script src="muscle-map.js?v=20250921-navlink"></script>
-<script src="nerve-map.js?v=20250921-navlink"></script>
-<script src="vessel-map.js?v=20250921-navlink"></script>
-<script src="app.js?v=20250921-NAV-LINK"></script>
+<script src="readings.js?v=20250922-navlink"></script>
+<script src="muscle-map.js?v=20250922-navlink"></script>
+<script src="nerve-map.js?v=20250922-navlink"></script>
+<script src="vessel-map.js?v=20250922-navlink"></script>
+<script src="app.js?v=20250922-NAV-LINK-HOTFIX4"></script>
 </body>
 </html>
