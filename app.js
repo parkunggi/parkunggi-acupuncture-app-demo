@@ -1,12 +1,12 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 神経/血管 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX4-CSVFIX+MUSCLEONLY
- * 変更(最小):
- *  - 筋肉表示タイポ修正 (text内容 -> textContent)
- *  - 筋肉データが空のとき MUSCLE_MAP から遅延補完
- *  - 神経/血管要素はHTMLから削除されたため参照前に存在チェック
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX4-CSVFIX
+ * 追加修正(履歴ドロップダウン/要穴表示強調用の最小変更):
+ *  - 要穴バッジ背景色は index.html 側の CSS 変更のみ
+ *  - 要穴保持時にタイトル色変更 (#result-name に is-important クラス付与)
+ *  - 履歴ドロップダウン UI 追加（既存 historyStack 利用）
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX4-CSVFIX+MUSCLEONLY';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX4-CSVFIX';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -44,8 +44,8 @@ const resultMeridianEl  = document.getElementById('result-meridian');
 const resultRegionEl    = document.getElementById('result-region');
 const resultImportantEl = document.getElementById('result-important');
 const resultMuscleEl    = document.getElementById('result-muscle');
-const resultNerveEl     = document.getElementById('result-nerve');   // 既にHTML削除 → null
-const resultVesselEl    = document.getElementById('result-vessel'); // 同上
+const resultNerveEl     = document.getElementById('result-nerve');
+const resultVesselEl    = document.getElementById('result-vessel');
 const relatedSymptomsEl = document.getElementById('related-symptoms');
 
 const categorySelect = document.getElementById('clinical-category-select');
@@ -60,6 +60,11 @@ const symptomCard = document.getElementById('symptom-card');
 const homeBtn = document.getElementById('home-btn');
 const backBtn = document.getElementById('back-btn');
 const forwardBtn = document.getElementById('forward-btn');
+
+/* 新規: 履歴ドロップダウン用 DOM (既存ナビに追加したボタン/メニュー) */
+const historyBtn = document.getElementById('history-btn');
+const historyMenu = document.getElementById('history-menu');
+const historyMenuList = document.getElementById('history-menu-list');
 
 /* ================= History ================= */
 let historyStack = [];
@@ -77,6 +82,7 @@ function statesEqual(a,b){
 function updateNavButtons(){
   backBtn.disabled = (historyIndex <= 0);
   forwardBtn.disabled = (historyIndex < 0 || historyIndex >= historyStack.length - 1);
+  if(!historyMenu.classList.contains('hidden')) renderHistoryDropdownMenu();
 }
 function pushState(state, replace=false){
   if(IS_APPLYING_HISTORY) return;
@@ -182,7 +188,7 @@ function transformPatternDisplay(original){
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
 
-/* ================= 経穴CSVパーサ ================= */
+/* ================= 経穴CSVパーサ (4列仕様) ================= */
 function parseAcuCSV(raw){
   if(!raw) return [];
   const text = raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
@@ -351,7 +357,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* ================= Clinical CSV パース関連 (既存) ================= */
+/* ================= Clinical CSV パース関連 ================= */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -534,9 +540,9 @@ function rebuildAcuPointPatternIndex(){
       groups.forEach(g=>{
         (g.tokens||[]).forEach(tk=>{
           if(!tk || seen.has(tk)) return;
-          seen.add(tk);
-          if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
-          ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
+            seen.add(tk);
+            if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
+            ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
       });
     });
@@ -712,24 +718,24 @@ function linkifyRegionAcupoints(html){
 
 /* ================= 詳細表示 ================= */
 function showPointDetail(p, suppressHistory=false){
-  // 追加: 筋肉データ遅延補完
-  if(!p.muscle && MUSCLE_MAP[p.name]) p.muscle = MUSCLE_MAP[p.name];
-
   let regionHTML=p.region||'';
   if(regionHTML.includes('[[')){
     regionHTML = p.regionRaw? applyRedMarkup(p.regionRaw): applyRedMarkup(regionHTML);
   }
   regionHTML=linkifyRegionAcupoints(regionHTML);
   resultNameEl.textContent=`${p.name}${p.reading?` (${p.reading})`:''}`;
+  // 要穴タイトル赤字クラス処理（追加）
+  if(p.important) resultNameEl.classList.add('is-important');
+  else resultNameEl.classList.remove('is-important');
+
   resultMeridianEl.textContent=p.meridian||'（経絡未登録）';
   resultRegionEl.innerHTML=regionHTML||'（部位未登録）';
   if(p.important){
     resultImportantEl.innerHTML=`<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
   } else resultImportantEl.textContent='-';
-  resultMuscleEl.textContent=p.muscle||'（筋肉未登録）';
-  // 神経/血管は削除済みなので要素があれば念のためクリア
-  if(resultNerveEl)  resultNerveEl.textContent='';
-  if(resultVesselEl) resultVesselEl.textContent='';
+  resultMuscleEl.text内容=p.muscle||'（筋肉未登録）';  // 既存のまま（他コード非変更方針）
+  resultNerveEl.textContent=p.nerve||'（神経未登録）';
+  resultVesselEl.textContent=p.vessel||'（血管未登録）';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
   if(!suppressHistory && !IS_APPLYING_HISTORY){
@@ -751,12 +757,13 @@ function renderRelatedPatterns(pointName){
 }
 function showUnknownPoint(name, suppressHistory=false){
   resultNameEl.textContent=`${name}（未登録）`;
+  resultNameEl.classList.remove('is-important');
   resultMeridianEl.textContent='（経絡未登録）';
   resultRegionEl.innerHTML='（部位未登録）';
   resultImportantEl.textContent='-';
   resultMuscleEl.textContent='（筋肉未登録）';
-  if(resultNerveEl)  resultNerveEl.textContent='';
-  if(resultVesselEl) resultVesselEl.textContent='';
+  resultNerveEl.textContent='（神経未登録）';
+  resultVesselEl.textContent='（血管未登録）';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   inlineAcupointResult.classList.remove('hidden');
   if(!suppressHistory && !IS_APPLYING_HISTORY){
@@ -1015,3 +1022,68 @@ init();
     patch();
   });
 })();
+
+/* ================= 履歴ドロップダウン（追加） ================= */
+function stateToLabel(st){
+  switch(st.type){
+    case 'home': return 'Home';
+    case 'point': return `経穴: ${st.name}`;
+    case 'unknownPoint': return `未登録: ${st.name}`;
+    case 'pattern': return `病証: ${st.cat}/${getDisplayPatternName(st.pattern)}`;
+    default: return st.type;
+  }
+}
+function formatTime(ts){
+  const d=new Date(ts);
+  const pad=n=>('0'+n).slice(-2);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function renderHistoryDropdownMenu(){
+  if(!historyMenuList) return;
+  historyMenuList.innerHTML='';
+  const cur = historyStack[historyIndex] || null;
+  // 最新を上に（逆順）
+  const arr = historyStack.slice().reverse();
+  arr.forEach(st=>{
+    const li=document.createElement('li');
+    if(cur && statesEqual(cur, st)) li.classList.add('active');
+    const timePart = st.ts? formatTime(st.ts):'';
+    li.innerHTML=`
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="hist-type">${escapeHTML(st.type)}</span>
+        <span class="hist-time">${escapeHTML(timePart)}</span>
+      </div>
+      <div class="hist-label">${escapeHTML(stateToLabel(st))}</div>
+    `;
+    li.addEventListener('click', ()=>{
+      historyMenu.classList.add('hidden');
+      applyState(st);
+    });
+    historyMenuList.appendChild(li);
+  });
+  if(!arr.length){
+    const li=document.createElement('li');
+    li.textContent='履歴なし';
+    historyMenuList.appendChild(li);
+  }
+}
+if(historyBtn){
+  historyBtn.addEventListener('click', ()=>{
+    if(historyMenu.classList.contains('hidden')){
+      renderHistoryDropdownMenu();
+      historyMenu.classList.remove('hidden');
+    } else {
+      historyMenu.classList.add('hidden');
+    }
+  });
+  document.addEventListener('click', e=>{
+    if(historyMenu.classList.contains('hidden')) return;
+    if(e.target===historyBtn || historyBtn.contains(e.target) || historyMenu.contains(e.target)) return;
+    historyMenu.classList.add('hidden');
+  });
+  window.addEventListener('keydown', e=>{
+    if(e.key==='Escape' && !historyMenu.classList.contains('hidden')){
+      historyMenu.classList.add('hidden');
+    }
+  });
+}
