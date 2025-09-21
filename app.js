@@ -1,15 +1,11 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 神経/血管 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX2
- * 改善:
- *  - 初期履歴 push をデータロード後に実行
- *  - init 全体 try/catch
- *  - ロード時/失敗時ログ
- *  - 例外時にステータス更新
- *  - pushState 同一連続抑止
- *  - 履歴適用中フラグで再 push 防止
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX3
+ * 修正:
+ *  - 参照漏れしていた関数 (parseTreatmentPoints / buildNameLookup ほか) を再挿入
+ *  - 依存ユーティリティを一括復元
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX2';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX3';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -86,10 +82,7 @@ function pushState(state, replace=false){
   if(historyIndex>=0 && statesEqual(historyStack[historyIndex], state)) return;
   if(replace){
     if(historyIndex>=0) historyStack[historyIndex]=state;
-    else {
-      historyStack.push(state);
-      historyIndex=0;
-    }
+    else { historyStack.push(state); historyIndex=0; }
   } else {
     if(historyIndex < historyStack.length -1){
       historyStack = historyStack.slice(0, historyIndex+1);
@@ -98,7 +91,6 @@ function pushState(state, replace=false){
     historyIndex = historyStack.length -1;
   }
   updateNavButtons();
-  // console.debug('HIST push', historyIndex, state, historyStack);
 }
 function applyState(state){
   if(!state) return;
@@ -188,6 +180,48 @@ function transformPatternDisplay(original){
   return original;
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
+
+/* ==== Token / Lookup Utilities (復元) ==== */
+function parseTreatmentPoints(raw){
+  if(!raw) return [];
+  const stripped = raw
+    .replace(/（[^）]*）/g,'')
+    .replace(/\([^)]*\)/g,'');
+  return stripped
+    .replace(/\r?\n/g,'/')
+    .replace(/[，、]/g,'/')
+    .replace(/[＋+･・]/g,'/')
+    .replace(/／/g,'/')
+    .replace(/\/{2,}/g,'/')
+    .split('/')
+    .map(t=>removeAllUnicodeSpaces(t))
+    .map(t=>t.trim())
+    .filter(t=>t.length)
+    .map(t=>t.replace(/[。.,、，;；/]+$/,''))
+    .filter(Boolean);
+}
+function normalizeAcuLookupName(name){
+  return removeAllUnicodeSpaces(name||'').trim();
+}
+function findAcupointByToken(token){
+  const key=normalizeAcuLookupName(token);
+  if(!key) return null;
+  return ACUPOINTS.find(p=>p.name===key);
+}
+function buildNameLookup(){
+  ACUPOINT_NAME_LIST = ACUPOINTS.map(p=>p.name).sort((a,b)=> b.length - a.length);
+  ACUPOINT_NAME_SET = new Set(ACUPOINT_NAME_LIST);
+}
+function matchTokenWithSpaces(raw,pos,token){
+  let i=pos,k=0,len=raw.length;
+  while(k<token.length){
+    while(i<len && isSpace(raw[i])) i++;
+    if(i>=len) return 0;
+    if(raw[i]!==token[k]) return 0;
+    i++; k++;
+  }
+  return i - pos;
+}
 
 /* ================= CSV: 経穴 ================= */
 function parseAcuCSV(text){
@@ -367,7 +401,7 @@ function parseClinicalCSV(raw){
           i++;
         } else {
           const next=table[i+1]||[];
-            const commentRow=isPotentialCommentRow(next)? next:null;
+          const commentRow=isPotentialCommentRow(next)? next:null;
           patternNames.forEach((pName,idx)=>{
             const col=idx+1;
             const cell=r[col]||'';
@@ -410,7 +444,7 @@ function rebuildAcuPointPatternIndex(){
       groups.forEach(g=>{
         (g.tokens||[]).forEach(tk=>{
           if(!tk || seen.has(tk)) return;
-          seen.add(tk);
+            seen.add(tk);
           if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
           ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
@@ -560,9 +594,7 @@ function linkifyRegionAcupoints(html){
       for(let i=0;i<work.length;){
         let matched=null,len=0;
         for(const name of ACUPOINT_NAME_LIST){
-          if(work.startsWith(name,i)){
-            matched=name; len=name.length; break;
-          }
+          if(work.startsWith(name,i)){ matched=name; len=name.length; break; }
         }
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
@@ -795,7 +827,6 @@ document.addEventListener('click', e=>{
 /* ================= ロード ================= */
 async function loadAcuCSV(){
   statusEl.textContent='経穴CSV: 読込中';
-  console.log('[LOAD] acu start', CSV_PATH);
   try{
     const res=await fetch(`${CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -813,7 +844,6 @@ async function loadAcuCSV(){
     statusEl.textContent=(total===EXPECTED_TOTAL)
       ? `経穴CSV: ${total}件`
       : `経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`;
-    console.log('[LOAD] acu done', total);
   }catch(err){
     console.error('[LOAD] acu error', err);
     statusEl.textContent='経穴CSV: 失敗 '+err.message;
@@ -823,7 +853,6 @@ async function loadAcuCSV(){
 }
 async function loadClinicalCSV(){
   clinicalStatusEl.textContent='臨床CSV: 読込中';
-  console.log('[LOAD] clinical start', CLINICAL_CSV_PATH);
   try{
     const res=await fetch(`${CLINICAL_CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -837,7 +866,6 @@ async function loadClinicalCSV(){
     });
     rebuildAcuPointPatternIndex();
     clinicalStatusEl.textContent=`臨床CSV: ${CLINICAL_DATA.order.length}カテゴリ`;
-    console.log('[LOAD] clinical done', CLINICAL_DATA.order.length);
   }catch(err){
     console.error('[LOAD] clinical error', err);
     clinicalStatusEl.textContent='臨床CSV: 失敗 '+err.message;
@@ -857,13 +885,9 @@ function init(){
       inputEl.focus();
       inputEl.select();
     });
-    // データロード完了を待って home 状態を履歴へ (両方終わったら)
-    const waitReady = setInterval(()=>{
-      if(DATA_READY || CLINICAL_READY){
-        // どちらか先にでもホームとして push（重複防止）
-        if(historyStack.length===0){
-          pushState({type:'home'});
-        }
+    const waitReady=setInterval(()=>{
+      if((DATA_READY || CLINICAL_READY) && historyStack.length===0){
+        pushState({type:'home'});
       }
       if(DATA_READY && CLINICAL_READY){
         clearInterval(waitReady);
