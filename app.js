@@ -1,9 +1,9 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 神経/血管 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX4
- * 修正:
- *  - 治療方針表示に必要な buildPointsHTML / linkifyParenthesisGroup を復元
- *  - patternSelect ハンドラに try/catch 追加（例外時の黙殺防止）
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX4+CSV-PARSER
+ * 追加:
+ *  - parseAcuCSV 実装復元
+ *  - コメントで列仕様を明記
  ******************************************************/
 const APP_VERSION = '20250922-NAV-LINK-HOTFIX4';
 
@@ -112,7 +112,7 @@ function applyState(state){
             categorySelect.value=state.cat;
             categorySelect.dispatchEvent(new Event('change'));
           }
-          if(state.pattern){
+            if(state.pattern){
             patternSelect.value=state.pattern;
             patternSelect.dispatchEvent(new Event('change'));
           }
@@ -181,6 +181,80 @@ function transformPatternDisplay(original){
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
 
+/* ==== CSV (経穴) パーサ ==== */
+/**
+ * 想定カラム順:
+ * 0: 経穴名
+ * 1: 読み (任意)
+ * 2: 経絡
+ * 3: 部位 (region)
+ * 4: 要穴 (important)
+ * 5: 筋肉 (muscle)
+ * 6: 神経 (nerve)
+ * 7: 血管 (vessel)
+ * 以降は無視。ヘッダ行(経穴名 等を含む)はスキップ。
+ * 補完: 読み/筋肉/神経/血管はマップで空欄を補う( CSV > MAP )。
+ */
+function parseAcuCSV(raw){
+  if(!raw) return [];
+  const text = raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
+  const lines = text.split('\n').filter(l=>l.trim().length>0);
+
+  function splitCSVLine(line){
+    const out=[]; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){
+        if(inQ && line[i+1]==='"'){ cur+='"'; i++; }
+        else inQ=!inQ;
+        continue;
+      }
+      if(ch===',' && !inQ){
+        out.push(cur);
+        cur='';
+      } else cur+=ch;
+    }
+    out.push(cur);
+    return out.map(c=>c.trim());
+  }
+
+  const rows = lines.map(splitCSVLine);
+  const results=[];
+  rows.forEach(cols=>{
+    if(!cols.length) return;
+    const c0=cols[0];
+    if(/経穴名/.test(c0) || c0==='name') return; // ヘッダ
+    const name = trimOuter(c0);
+    if(!name) return;
+
+    const readingCSV = cols[1]||'';
+    const meridian   = cols[2]||'';
+    const region     = cols[3]||'';
+    const important  = cols[4]||'';
+    const muscleCSV  = cols[5]||'';
+    const nerveCSV   = cols[6]||'';
+    const vesselCSV  = cols[7]||'';
+
+    const reading = readingCSV || READINGS[name] || '';
+    const muscle  = muscleCSV  || MUSCLE_MAP[name] || '';
+    const nerve   = nerveCSV   || NERVE_MAP[name]   || '';
+    const vessel  = vesselCSV  || VESSEL_MAP[name]  || '';
+
+    results.push({
+      name,
+      reading,
+      meridian,
+      region,
+      regionRaw: region,  // [[ ]] の元保存
+      important,
+      muscle,
+      nerve,
+      vessel
+    });
+  });
+  return results;
+}
+
 /* ==== Token / Lookup Utilities ==== */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
@@ -224,7 +298,6 @@ function matchTokenWithSpaces(raw,pos,token){
 }
 
 /* ==== 治療点テキスト → クリック可能リンク HTML ==== */
-/* 括弧内リンク化（元テキストを一旦走査） */
 function linkifyParenthesisGroup(group){
   if(group.length<2) return escapeHTML(group);
   const open=group[0], close=group[group.length-1];
@@ -255,11 +328,9 @@ function linkifyParenthesisGroup(group){
   return escapeHTML(open)+out+escapeHTML(close);
 }
 
-/* 治療点セル本文を逐次走査しトークン化された点名をリンク化 */
 function buildPointsHTML(rawPoints, tokens){
   if(!rawPoints) return '';
   const uniqueTokens = Array.from(new Set(tokens||[]));
-  // 長い名前優先
   const sortedTokens = uniqueTokens.sort((a,b)=> b.length - a.length);
 
   let i=0, out='', len=rawPoints.length;
@@ -438,7 +509,7 @@ function parseClinicalCSV(raw){
           i++;
         } else {
           const next=table[i+1]||[];
-          const commentRow=isPotentialCommentRow(next)? next:null;
+            const commentRow=isPotentialCommentRow(next)? next:null;
           patternNames.forEach((pName,idx)=>{
             const col=idx+1;
             const cell=r[col]||'';
@@ -553,7 +624,7 @@ function setActive(items, idx){
   });
   if(items[idx]){
     items[idx].classList.add('active');
-    items[idx].setAttribute('aria-selected','true');
+    li.setAttribute('aria-selected','true');
     items[idx].scrollIntoView({block:'nearest'});
   }
 }
