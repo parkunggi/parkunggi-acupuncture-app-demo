@@ -1,12 +1,17 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 神経/血管 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX4-CSVFIX
- * 追加修正:
- *  - CSV（経絡,経穴,部位,要穴 の4列）用 parseAcuCSV を再実装
- *  - カテゴリ行 & ヘッダ行スキップ
- *  - 361件に正規化
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX6-REVERT-LINK+HIST-DROP
+ *
+ * 追加:
+ *  - 履歴ドロップダウン UI
+ *  - 直近最大60件表示/フィルタ/ジャンプ/全削除
+ * 既存:
+ *  - 4列CSVパーサ (経絡,経穴,部位,要穴)
+ *  - 履歴 state: home / point / pattern / unknownPoint
+ *  - URL 同期 (?point= / ?cat=&pattern=)
+ *  - 履歴サイズ制限 HISTORY_MAX
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX4-CSVFIX';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX6-REVERT-LINK+HIST-DROP';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -21,6 +26,13 @@ const READINGS    = window.ACU_READINGS    || {};
 const MUSCLE_MAP  = window.ACU_MUSCLE_MAP  || {};
 const NERVE_MAP   = window.ACU_NERVE_MAP   || {};
 const VESSEL_MAP  = window.ACU_VESSEL_MAP  || {};
+
+const HISTORY_MAX = 300;
+const ENABLE_URL_SYNC = true;
+
+const URL_PARAM_POINT   = 'point';
+const URL_PARAM_CAT     = 'cat';
+const URL_PARAM_PATTERN = 'pattern';
 
 let ACUPOINTS = [];
 let ACUPOINT_NAME_LIST = [];
@@ -61,10 +73,23 @@ const homeBtn = document.getElementById('home-btn');
 const backBtn = document.getElementById('back-btn');
 const forwardBtn = document.getElementById('forward-btn');
 
+/* ==== History Dropdown Elements ==== */
+const historyToggleBtn = document.getElementById('history-toggle-btn');
+const historyPanel     = document.getElementById('history-panel');
+const historyFilterEl  = document.getElementById('history-filter');
+const historyListEl    = document.getElementById('history-list');
+const historyCloseBtn  = document.getElementById('history-close-btn');
+const historyClearBtn  = document.getElementById('history-clear-btn');
+const historyCountLabel= document.getElementById('history-count-label');
+
 /* ================= History ================= */
 let historyStack = [];
 let historyIndex = -1;
 let IS_APPLYING_HISTORY = false;
+let IS_APPLYING_BROWSER_HISTORY = false;
+let INITIAL_URL_STATE = null;
+let INITIAL_STATE_APPLIED = false;
+let IS_APPLYING_FROM_HISTORY_DROPDOWN = false;
 
 function statesEqual(a,b){
   if(!a||!b) return false;
@@ -75,68 +100,154 @@ function statesEqual(a,b){
   return false;
 }
 function updateNavButtons(){
-  backBtn.disabled = (historyIndex <= 0);
-  forwardBtn.disabled = (historyIndex < 0 || historyIndex >= historyStack.length - 1);
+  backBtn.disabled = false;
+  forwardBtn.disabled = false;
+}
+function trimHistoryIfNeeded(){
+  if(historyStack.length <= HISTORY_MAX) return;
+  const overflow = historyStack.length - HISTORY_MAX;
+  historyStack.splice(0, overflow);
+  historyIndex -= overflow;
+  if(historyIndex < 0) historyIndex = 0;
+}
+function stateToLabel(st){
+  switch(st.type){
+    case 'home': return 'Home';
+    case 'point': return `経穴: ${st.name}`;
+    case 'unknownPoint': return `未登録: ${st.name}`;
+    case 'pattern': return `病証: ${st.cat} / ${getDisplayPatternName(st.pattern)}`;
+    default: return st.type;
+  }
+}
+function stateToQueryString(state){
+  if(!state || state.type==='home') return '';
+  const p = new URLSearchParams();
+  switch(state.type){
+    case 'point':
+    case 'unknownPoint':
+      p.set(URL_PARAM_POINT, state.name); break;
+    case 'pattern':
+      p.set(URL_PARAM_CAT, state.cat);
+      p.set(URL_PARAM_PATTERN, state.pattern);
+      break;
+  }
+  const qs = p.toString();
+  return qs? '?'+qs : '';
+}
+function parseStateFromLocation(){
+  try{
+    const url = new URL(window.location.href);
+    const point = url.searchParams.get(URL_PARAM_POINT);
+    const cat   = url.searchParams.get(URL_PARAM_CAT);
+    const pat   = url.searchParams.get(URL_PARAM_PATTERN);
+    if(cat && pat){
+      return { type:'pattern', cat, pattern:pat };
+    }
+    if(point){
+      return { type:'point', name:point };
+    }
+    return { type:'home', _prefillCat: cat || null };
+  }catch(e){
+    return { type:'home' };
+  }
+}
+function syncBrowserURL(state, replace=false){
+  if(!ENABLE_URL_SYNC) return;
+  const q = stateToQueryString(state);
+  const newURL = window.location.pathname + q;
+  const histState = { appState: state, appVersion: APP_VERSION };
+  if(replace){
+    window.history.replaceState(histState,'',newURL);
+  } else {
+    window.history.pushState(histState,'',newURL);
+  }
 }
 function pushState(state, replace=false){
-  if(IS_APPLYING_HISTORY) return;
-  if(historyIndex>=0 && statesEqual(historyStack[historyIndex], state)) return;
+  if(IS_APPLYING_HISTORY || IS_APPLYING_BROWSER_HISTORY || IS_APPLYING_FROM_HISTORY_DROPDOWN) return;
+  if(historyIndex>=0 && statesEqual(historyStack[historyIndex], state)){
+    if(replace && ENABLE_URL_SYNC) syncBrowserURL(state,true);
+    return;
+  }
+  if(!state.ts) state.ts = Date.now();
   if(replace){
-    if(historyIndex>=0) historyStack[historyIndex]=state;
-    else { historyStack.push(state); historyIndex=0; }
+    if(historyIndex>=0){
+      historyStack[historyIndex]=state;
+    } else {
+      historyStack.push(state);
+      historyIndex=0;
+    }
+    if(ENABLE_URL_SYNC) syncBrowserURL(state,true);
   } else {
     if(historyIndex < historyStack.length -1){
       historyStack = historyStack.slice(0, historyIndex+1);
     }
     historyStack.push(state);
     historyIndex = historyStack.length -1;
+    trimHistoryIfNeeded();
+    if(ENABLE_URL_SYNC) syncBrowserURL(state,false);
   }
   updateNavButtons();
+  renderHistoryDropdown();
 }
 function applyState(state){
   if(!state) return;
-  IS_APPLYING_HISTORY=true;
+  IS_APPLYING_HISTORY = true;
   try{
     switch(state.type){
-      case 'home': goHome(true); break;
-      case 'point': {
-        const p=ACUPOINTS.find(x=>x.name===state.name);
-        if(p) showPointDetail(p,true); else showUnknownPoint(state.name,true);
+      case 'home':
+        goHome(true);
+        if(state._prefillCat && CLINICAL_READY){
+          if(CLINICAL_DATA.cats[state._prefillCat]){
+            categorySelect.value=state._prefillCat;
+            categorySelect.dispatchEvent(new Event('change'));
+          }
+        }
         break;
-      }
+      case 'point':
+        if(!DATA_READY) break;
+        {
+          const p=ACUPOINTS.find(x=>x.name===state.name);
+          if(p) showPointDetail(p,true);
+          else showUnknownPoint(state.name,true);
+        }
+        break;
       case 'unknownPoint':
         showUnknownPoint(state.name,true);
         break;
       case 'pattern':
         if(CLINICAL_READY){
-          if(state.cat){
-            categorySelect.value=state.cat;
-            categorySelect.dispatchEvent(new Event('change'));
-          }
-          if(state.pattern){
-            patternSelect.value=state.pattern;
-            patternSelect.dispatchEvent(new Event('change'));
-          }
+          categorySelect.value=state.cat;
+          categorySelect.dispatchEvent(new Event('change'));
+          patternSelect.value=state.pattern;
+          patternSelect.dispatchEvent(new Event('change'));
         }
         break;
     }
   } finally {
     IS_APPLYING_HISTORY=false;
     updateNavButtons();
+    renderHistoryDropdown();
   }
 }
-function goBack(){
-  if(historyIndex>0){
-    historyIndex--;
-    applyState(historyStack[historyIndex]);
+backBtn.addEventListener('click', ()=>window.history.back());
+forwardBtn.addEventListener('click', ()=>window.history.forward());
+window.addEventListener('popstate', (e)=>{
+  if(!ENABLE_URL_SYNC) return;
+  IS_APPLYING_BROWSER_HISTORY=true;
+  try{
+    let state = e.state && e.state.appState ? e.state.appState : parseStateFromLocation();
+    IS_APPLYING_HISTORY=true;
+    if(!(historyIndex>=0 && statesEqual(historyStack[historyIndex], state))){
+      historyStack.push(state);
+      historyIndex = historyStack.length -1;
+      trimHistoryIfNeeded();
+    }
+    IS_APPLYING_HISTORY=false;
+    applyState(state);
+  } finally {
+    IS_APPLYING_BROWSER_HISTORY=false;
   }
-}
-function goForward(){
-  if(historyIndex < historyStack.length -1){
-    historyIndex++;
-    applyState(historyStack[historyIndex]);
-  }
-}
+});
 
 /* ================= Utility ================= */
 function normalizeNFC(s){ return s? s.normalize('NFC'):''; }
@@ -182,22 +293,13 @@ function transformPatternDisplay(original){
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
 
-/* ================= 経穴CSVパーサ (4列仕様) =================
- * CSV列: 経絡,経穴,部位,要穴
- *  - カテゴリ行: "1.督脈" のようにカンマ無し → スキップ
- *  - ヘッダ行: 先頭2列が 経絡,経穴 → スキップ
- *  - 経絡 or 経穴 欠落行 → スキップ
- * 補完: reading/muscle/nerve/vessel はマップから
- */
+/* ================= 経穴CSVパーサ ================= */
 function parseAcuCSV(raw){
   if(!raw) return [];
   const text = raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
-  const lines = text.split('\n').filter(l=>l.trim().length>0);
-
-  function splitLine(line){
-    // 引用符ない前提（なければ高速 split）
+  const lines = text.split('\n').filter(l=>l.trim());
+  function split(line){
     if(!line.includes('"')) return line.split(',').map(c=>c.trim());
-    // 簡易クォート対応
     const out=[]; let cur=''; let inQ=false;
     for(let i=0;i<line.length;i++){
       const ch=line[i];
@@ -206,49 +308,39 @@ function parseAcuCSV(raw){
         else inQ=!inQ;
         continue;
       }
-      if(ch===',' && !inQ){
-        out.push(cur); cur='';
-      } else cur+=ch;
+      if(ch===',' && !inQ){ out.push(cur); cur=''; }
+      else cur+=ch;
     }
     out.push(cur);
     return out.map(c=>c.trim());
   }
-
   const results=[];
   for(const rawLine of lines){
-    if(/^[0-9０-９]+\./.test(rawLine.trim())) continue; // カテゴリ
-    const cols = splitLine(rawLine);
-    if(cols.length===0) continue;
-    // 4列未満でも構造崩れとしてスキップ
-    if(cols[0]==='経絡' && cols[1]==='経穴') continue; // ヘッダ
-    if(cols.length < 2) continue;
-    const meridian = trimOuter(cols[0]);
-    const name     = trimOuter(cols[1]);
-    if(!meridian || !name) continue;
-    const region   = cols[2]? cols[2].trim() : '';
-    const important= cols[3]? cols[3].trim() : '';
-
-    const reading  = READINGS[name] || '';
-    const muscle   = MUSCLE_MAP[name] || '';
-    const nerve    = NERVE_MAP[name] || '';
-    const vessel   = VESSEL_MAP[name] || '';
-
+    if(/^[0-9０-９]+\./.test(rawLine.trim())) continue;
+    const cols=split(rawLine);
+    if(cols[0]==='経絡' && cols[1]==='経穴') continue;
+    if(cols.length<2) continue;
+    const meridian=cols[0].trim();
+    const name=cols[1].trim();
+    if(!meridian||!name) continue;
+    const region=cols[2]? cols[2].trim():'';
+    const important=cols[3]? cols[3].trim():'';
     results.push({
       name,
-      reading,
+      reading: READINGS[name]||'',
       meridian,
       region,
       regionRaw: region,
       important,
-      muscle,
-      nerve,
-      vessel
+      muscle: MUSCLE_MAP[name]||'',
+      nerve: NERVE_MAP[name]||'',
+      vessel: VESSEL_MAP[name]||''
     });
   }
   return results;
 }
 
-/* ==== Token / Lookup Utilities ==== */
+/* ================= Treatment Tokens ================= */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
@@ -290,7 +382,7 @@ function matchTokenWithSpaces(raw,pos,token){
   return i - pos;
 }
 
-/* ==== 治療点テキスト → クリック可能リンク HTML ==== */
+/* ================= 治療点リンク化 ================= */
 function linkifyParenthesisGroup(group){
   if(group.length<2) return escapeHTML(group);
   const open=group[0], close=group[group.length-1];
@@ -309,9 +401,7 @@ function linkifyParenthesisGroup(group){
       if(p){
         const imp=p.important?' acu-important':'';
         out+=`<a href="#" class="treat-point-link${imp}" data-point="${escapeHTML(p.name)}">${escapeHTML(p.name)}</a>`;
-      } else {
-        out+=escapeHTML(matched);
-      }
+      } else out+=escapeHTML(matched);
       i+=consumed;
     } else {
       out+=escapeHTML(ch);
@@ -337,7 +427,6 @@ function buildPointsHTML(rawPoints, tokens){
       continue;
     }
     if(isSpace(ch)){ out+=escapeHTML(ch); i++; continue; }
-
     let matched=null, consumed=0;
     for(const tk of sortedTokens){
       const c = matchTokenWithSpaces(rawPoints, i, tk);
@@ -360,8 +449,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* ================= Clinical CSV パース関連 ================= */
-/* (以下 臨床CSV 部分は既存そのまま) */
+/* ================= Clinical CSV Parsing ================= */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -500,7 +588,7 @@ function parseClinicalCSV(raw){
           });
           i++;
         } else {
-          const next=table[i+1]||[];
+            const next=table[i+1]||[];
           const commentRow=isPotentialCommentRow(next)? next:null;
           patternNames.forEach((pName,idx)=>{
             const col=idx+1;
@@ -544,9 +632,9 @@ function rebuildAcuPointPatternIndex(){
       groups.forEach(g=>{
         (g.tokens||[]).forEach(tk=>{
           if(!tk || seen.has(tk)) return;
-            seen.add(tk);
-            if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
-            ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
+          seen.add(tk);
+          if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
+          ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
       });
     });
@@ -586,7 +674,7 @@ function filterPoints(qInput){
   }
   const nm=[]; const seen=new Set();
   for(const p of ACUPOINTS){
-    if(p.name.includes(q)){ nm.push({...p._matchType? p:{...p,_matchType:'name'}}); seen.add(p.name); }
+    if(p.name.includes(q)){ nm.push({...p,_matchType:'name'}); seen.add(p.name); }
   }
   const mm=[],nv=[],vs=[];
   for(const p of ACUPOINTS){
@@ -624,10 +712,10 @@ function renderSuggestions(list){
   suggestionListEl.innerHTML='';
   const qRaw=removeAllUnicodeSpaces(inputEl.value);
   const hira=isHiraganaOnly(qRaw)? qRaw:'';
-  const qRegex=hira? new RegExp(hira.replace(/([.*+?^=!:${}()|[\\]\\])/g,'\\$1'),'g'):null;
+  const qRegex=hira? new RegExp(hira.replace(/([.*+?^=!:${}()|[\]\\])/g,'\\$1'),'g'):null;
   list.slice(0,120).forEach((p,i)=>{
     const li=document.createElement('li');
-    li.dataset.id=p.name; // name を一意キーに（id 無いので）
+    li.dataset.id=p.name;
     li.dataset.matchType=p._matchType||'';
     li.setAttribute('role','option');
     li.setAttribute('aria-selected', i===0?'true':'false');
@@ -679,7 +767,7 @@ function handleSuggestionKeyboard(e){
   } else if(e.key==='Escape'){ clearSuggestions(); }
 }
 
-/* ================= 部位内経穴リンク化 ================= */
+/* ================= 部位内リンク化 ================= */
 function linkifyRegionAcupoints(html){
   if(!html || !ACUPOINT_NAME_LIST.length) return html;
   const wrapper=document.createElement('div');
@@ -733,13 +821,13 @@ function showPointDetail(p, suppressHistory=false){
   if(p.important){
     resultImportantEl.innerHTML=`<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
   } else resultImportantEl.textContent='-';
-  resultMuscleEl.text内容=p.muscle||'（筋肉未登録）';
+  resultMuscleEl.textContent=p.muscle||'（筋肉未登録）';
   resultNerveEl.textContent=p.nerve||'（神経未登録）';
   resultVesselEl.textContent=p.vessel||'（血管未登録）';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
-  if(!suppressHistory && !IS_APPLYING_HISTORY){
-    pushState({type:'point',name:p.name});
+  if(!suppressHistory && !IS_APPLYING_HISTORY && !IS_APPLYING_BROWSER_HISTORY && !IS_APPLYING_FROM_HISTORY_DROPDOWN){
+    pushState({type:'point', name:p.name});
   }
   requestAnimationFrame(equalizeTopCards);
 }
@@ -765,7 +853,7 @@ function showUnknownPoint(name, suppressHistory=false){
   resultVesselEl.textContent='（血管未登録）';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   inlineAcupointResult.classList.remove('hidden');
-  if(!suppressHistory && !IS_APPLYING_HISTORY){
+  if(!suppressHistory && !IS_APPLYING_HISTORY && !IS_APPLYING_BROWSER_HISTORY && !IS_APPLYING_FROM_HISTORY_DROPDOWN){
     pushState({type:'unknownPoint',name});
   }
   requestAnimationFrame(equalizeTopCards);
@@ -783,7 +871,9 @@ categorySelect.addEventListener('change', ()=>{
   patternSelect.disabled=true;
   clinicalResultEl.classList.add('hidden');
   clinicalGroupsEl.innerHTML='';
-  if(!cat || !CLINICAL_DATA.cats[cat]){ requestAnimationFrame(equalizeTopCards); return; }
+  if(!cat || !CLINICAL_DATA.cats[cat]){
+    requestAnimationFrame(equalizeTopCards); return;
+  }
   CLINICAL_DATA.cats[cat].patternOrder.forEach(pat=>{
     const opt=document.createElement('option');
     opt.value=pat;
@@ -793,14 +883,15 @@ categorySelect.addEventListener('change', ()=>{
   patternSelect.disabled=false;
   requestAnimationFrame(equalizeTopCards);
 });
-
 patternSelect.addEventListener('change', ()=>{
   try{
     const cat=categorySelect.value;
     const pat=patternSelect.value;
     clinicalResultEl.classList.add('hidden');
     clinicalGroupsEl.innerHTML='';
-    if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]){ requestAnimationFrame(equalizeTopCards); return; }
+    if(!cat || !pat || !CLINICAL_DATA.cats[cat] || !CLINICAL_DATA.cats[cat].patterns[pat]){
+      requestAnimationFrame(equalizeTopCards); return;
+    }
     const groups=CLINICAL_DATA.cats[cat].patterns[pat];
     const span=clinicalTitleEl.querySelector('.pattern-name-highlight');
     if(span) span.textContent=getDisplayPatternName(pat);
@@ -824,7 +915,7 @@ patternSelect.addEventListener('change', ()=>{
         if(p) showPointDetail(p); else showUnknownPoint(nm);
       });
     });
-    if(!IS_APPLYING_HISTORY){
+    if(!IS_APPLYING_HISTORY && !IS_APPLYING_BROWSER_HISTORY && !IS_APPLYING_FROM_HISTORY_DROPDOWN){
       pushState({type:'pattern',cat,pattern:pat});
     }
   }catch(err){
@@ -850,7 +941,7 @@ document.addEventListener('click', e=>{
   patternSelect.dispatchEvent(new Event('change'));
 });
 
-/* ==== 部位/治療点リンク ==== */
+/* ==== 治療点リンク ==== */
 document.addEventListener('click', e=>{
   const a=e.target.closest('.treat-point-link');
   if(!a) return;
@@ -861,6 +952,7 @@ document.addEventListener('click', e=>{
 });
 
 /* ================= ホーム ================= */
+homeBtn.addEventListener('click', ()=>goHome());
 function goHome(suppressHistory=false){
   inputEl.value='';
   clearSuggestions();
@@ -879,22 +971,11 @@ function goHome(suppressHistory=false){
     inputEl.focus();
     inputEl.select();
   });
-  requestAnimationFrame(equalizeTopCards);
-  if(!suppressHistory && !IS_APPLYING_HISTORY){
+  if(!suppressHistory && !IS_APPLYING_HISTORY && !IS_APPLYING_BROWSER_HISTORY && !IS_APPLYING_FROM_HISTORY_DROPDOWN){
     pushState({type:'home'});
   }
+  requestAnimationFrame(equalizeTopCards);
 }
-homeBtn.addEventListener('click', ()=>goHome());
-
-/* ================= ナビ ================= */
-backBtn.addEventListener('click', goBack);
-forwardBtn.addEventListener('click', goForward);
-document.addEventListener('keydown', e=>{
-  if(e.altKey && !e.metaKey && !e.shiftKey){
-    if(e.key==='ArrowLeft'){ goBack(); }
-    else if(e.key==='ArrowRight'){ goForward(); }
-  }
-});
 
 /* ================= 検索 ================= */
 function runSearch(){
@@ -931,6 +1012,106 @@ document.addEventListener('click', e=>{
   }
 });
 
+/* ================= 履歴ドロップダウン ================= */
+function formatTime(ts){
+  const d=new Date(ts);
+  const pad=n=>('0'+n).slice(-2);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function currentHistoryState(){ return historyStack[historyIndex] || null; }
+function filteredHistoryData(){
+  const filter = (historyFilterEl?.value || '').trim().toLowerCase();
+  const raw = historyStack.slice().reverse();
+  const limit = 60;
+  const sliced = raw.slice(0, limit);
+  if(!filter) return sliced;
+  return sliced.filter(st=>{
+    const label = stateToLabel(st).toLowerCase();
+    if(label.includes(filter)) return true;
+    if(st.type==='point' || st.type==='unknownPoint'){
+      return st.name.toLowerCase().includes(filter);
+    }
+    if(st.type==='pattern'){
+      return (st.cat.toLowerCase().includes(filter) || st.pattern.toLowerCase().includes(filter));
+    }
+    return false;
+  });
+}
+function renderHistoryDropdown(){
+  if(!historyListEl) return;
+  const data = filteredHistoryData();
+  historyListEl.innerHTML='';
+  const cur = currentHistoryState();
+  data.forEach(st=>{
+    const li=document.createElement('li');
+    if(cur && statesEqual(cur, st)) li.classList.add('active');
+    const typeLbl = st.type;
+    const label = stateToLabel(st);
+    const timePart = st.ts? formatTime(st.ts): '';
+    li.innerHTML = `
+      <div class="hist-item-head">
+        <span class="hist-item-type">${escapeHTML(typeLbl)}</span>
+        <span class="hist-time">${escapeHTML(timePart)}</span>
+      </div>
+      <div class="hist-item-label">${escapeHTML(label)}</div>
+    `;
+    li.addEventListener('click', ()=>{
+      IS_APPLYING_FROM_HISTORY_DROPDOWN = true;
+      try{
+        applyState(st);
+        if(ENABLE_URL_SYNC){
+          const q = stateToQueryString(st);
+          const histState = { appState: st, appVersion: APP_VERSION };
+          window.history.pushState(histState,'', window.location.pathname + q);
+        }
+      } finally {
+        IS_APPLYING_FROM_HISTORY_DROPDOWN = false;
+        renderHistoryDropdown();
+      }
+    });
+    historyListEl.appendChild(li);
+  });
+  if(historyCountLabel){
+    historyCountLabel.textContent = `表示 ${data.length} / 総計 ${historyStack.length}`;
+  }
+}
+function openHistoryPanel(){
+  if(!historyPanel) return;
+  historyPanel.classList.remove('hist-hidden');
+  historyToggleBtn?.setAttribute('aria-expanded','true');
+  renderHistoryDropdown();
+  historyFilterEl?.focus();
+}
+function closeHistoryPanel(){
+  if(!historyPanel) return;
+  historyPanel.classList.add('hist-hidden');
+  historyToggleBtn?.setAttribute('aria-expanded','false');
+}
+historyToggleBtn?.addEventListener('click', ()=>{
+  if(historyPanel.classList.contains('hist-hidden')) openHistoryPanel();
+  else closeHistoryPanel();
+});
+historyCloseBtn?.addEventListener('click', ()=>closeHistoryPanel());
+historyFilterEl?.addEventListener('input', ()=>renderHistoryDropdown());
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && !historyPanel.classList.contains('hist-hidden')){
+    closeHistoryPanel();
+  }
+});
+document.addEventListener('click', e=>{
+  if(!historyPanel) return;
+  if(historyPanel.classList.contains('hist-hidden')) return;
+  if(e.target===historyPanel || e.target===historyToggleBtn || historyPanel.contains(e.target)) return;
+  closeHistoryPanel();
+});
+historyClearBtn?.addEventListener('click', ()=>{
+  if(!confirm('履歴を全て削除しますか？')) return;
+  historyStack=[];
+  historyIndex=-1;
+  goHome(false);
+  renderHistoryDropdown();
+});
+
 /* ================= ロード ================= */
 async function loadAcuCSV(){
   statusEl.textContent='経穴CSV: 読込中';
@@ -938,15 +1119,12 @@ async function loadAcuCSV(){
     const res=await fetch(`${CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const text=await res.text();
-    let parsed=parseAcuCSV(text);
-    // 重複（同名出現）は単純に最初優先とし id=name
-    ACUPOINTS=parsed;
+    ACUPOINTS=parseAcuCSV(text);
     buildNameLookup();
     DATA_READY=true;
-    const total=ACUPOINTS.length;
-    statusEl.textContent=(total===EXPECTED_TOTAL)
-      ? `経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`
-      : `経穴CSV: ${total}件 (想定${EXPECTED_TOTAL})`;
+    statusEl.textContent=(ACUPOINTS.length===EXPECTED_TOTAL)
+      ? `経穴CSV: ${ACUPOINTS.length}件 / 想定${EXPECTED_TOTAL}`
+      : `経穴CSV: ${ACUPOINTS.length}件 (想定${EXPECTED_TOTAL})`;
   }catch(err){
     console.error('[LOAD] acu error', err);
     statusEl.textContent='経穴CSV: 失敗 '+err.message;
@@ -964,7 +1142,8 @@ async function loadClinicalCSV(){
     CLINICAL_READY=true;
     categorySelect.innerHTML='<option value="">--</option>';
     CLINICAL_DATA.order.forEach(cat=>{
-      const opt=document.createElement('option'); opt.value=cat; opt.textContent=cat;
+      const opt=document.createElement('option');
+      opt.value=cat; opt.textContent=cat;
       categorySelect.appendChild(opt);
     });
     rebuildAcuPointPatternIndex();
@@ -980,6 +1159,7 @@ async function loadClinicalCSV(){
 /* ================= 初期化 ================= */
 function init(){
   try{
+    INITIAL_URL_STATE = ENABLE_URL_SYNC? parseStateFromLocation(): {type:'home'};
     loadAcuCSV();
     loadClinicalCSV();
     updateNavButtons();
@@ -989,13 +1169,15 @@ function init(){
       inputEl.select();
     });
     const waitReady=setInterval(()=>{
-      if((DATA_READY || CLINICAL_READY) && historyStack.length===0){
-        pushState({type:'home'});
+      if((DATA_READY || CLINICAL_READY) && !INITIAL_STATE_APPLIED){
+        pushState(INITIAL_URL_STATE,true);
+        applyState(INITIAL_URL_STATE);
+        INITIAL_STATE_APPLIED=true;
       }
       if(DATA_READY && CLINICAL_READY){
         clearInterval(waitReady);
       }
-    },150);
+    },120);
   }catch(err){
     console.error('[INIT] fatal', err);
     statusEl.textContent='経穴CSV: JSエラー';
@@ -1012,8 +1194,10 @@ init();
     if(!container) return;
     const patch=()=>{
       const el=document.getElementById('result-region');
-      if(el && el.innerHTML && el.innerHTML.includes('[[')){
-        el.innerHTML=applyRedMarkup(el.innerHTML);
+      if(el && el.innerHTML){
+        if(el.innerHTML.includes('[[')){
+          el.innerHTML=applyRedMarkup(el.innerHTML);
+        }
         el.innerHTML=linkifyRegionAcupoints(el.innerHTML);
       }
     };
@@ -1021,4 +1205,15 @@ init();
     mo.observe(container,{childList:true,subtree:true,characterData:true});
     patch();
   });
+})();
+
+/* ================= Version 表示 ================= */
+(function showVersion(){
+  const sf=document.getElementById('status-float');
+  if(sf){
+    const span=document.createElement('span');
+    span.style.marginLeft='8px';
+    span.textContent='Version: '+APP_VERSION;
+    sf.appendChild(span);
+  }
 })();
