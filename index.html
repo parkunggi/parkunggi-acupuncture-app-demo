@@ -18,468 +18,179 @@
   --important:#d97706;
   --radius:8px;
   --transition:0.15s;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-family: -apple-system,BlinkMacSystemFont,"Helvetica Neue","Segoe UI","Noto Sans JP",Arial,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Segoe UI","Noto Sans JP",Arial,sans-serif;
 }
 *{box-sizing:border-box;}
-body {
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-size:15px;
-  line-height:1.5;
-  -webkit-font-smoothing:antialiased;
+body{margin:0;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{text-decoration:underline;}
+h1,h2,h3{margin:0;font-weight:600;}
+button{font-family:inherit;}
+header{
+  background:var(--panel);border-bottom:1px solid var(--border);
+  padding:10px 14px 8px;position:sticky;top:0;z-index:200;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
 }
-a { color: var(--accent); text-decoration:none; }
-a:hover { text-decoration:underline; }
-h1,h2,h3 { margin:0; font-weight:600;}
-button { font-family:inherit; }
-hr{border:none;border-top:1px solid var(--border);margin:24px 0;}
-/* Layout */
-header {
-  background:var(--panel);
-  border-bottom:1px solid var(--border);
-  padding:10px 14px 8px;
-  position:sticky;
-  top:0;
-  z-index:100;
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  align-items:center;
-}
-.header-left{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex:1;
-  min-width:240px;
-}
-.header-title{
-  font-size:18px;
-  font-weight:600;
-  letter-spacing:.5px;
-  white-space:nowrap;
-}
-.nav-buttons {
-  display:flex;
-  gap:6px;
-}
+.header-left{display:flex;align-items:center;gap:12px;flex:1;min-width:240px;}
+.header-title{font-size:18px;font-weight:600;white-space:nowrap;}
+.nav-buttons{display:flex;gap:6px;}
 .nav-buttons button{
-  background:#eef2f7;
-  border:1px solid #ccd4de;
-  padding:6px 10px;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:13px;
+  background:#eef2f7;border:1px solid #ccd4de;padding:6px 10px;
+  border-radius:6px;cursor:pointer;font-size:13px;
 }
 .nav-buttons button:hover{background:#e4eaf1;}
 .nav-buttons button:disabled{opacity:.45;cursor:not-allowed;}
-#status-float{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  align-items:center;
-  font-size:12px;
-  color:#333;
-}
+#status-float{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:#333;}
 .status-chip{
-  background:#eef2f7;
-  padding:4px 8px;
-  border-radius:20px;
-  border:1px solid #d0d7e2;
-  display:flex;
-  gap:4px;
-  align-items:center;
+  background:#eef2f7;padding:4px 8px;border-radius:20px;border:1px solid #d0d7e2;
+  display:flex;gap:4px;align-items:center;
 }
-main {
-  padding:18px clamp(8px,3vw,30px) 40px;
-  max-width:1400px;
-  margin:0 auto;
-}
+main{padding:18px clamp(8px,3vw,30px) 40px;max-width:1400px;margin:0 auto;}
 
-/* Cards */
-.cards-grid {
-  display:grid;
-  gap:18px;
-}
-@media (min-width: 860px){
-  .cards-grid {
-    grid-template-columns:1fr 1fr;
-    align-items:start;
-  }
-}
+.cards-grid{display:grid;gap:18px;}
+@media (min-width:860px){.cards-grid{grid-template-columns:1fr 1fr;align-items:start;}}
 .card{
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:16px 18px 20px;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-  position:relative;
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px 20px;display:flex;flex-direction:column;gap:14px;position:relative;
   box-shadow:0 2px 4px rgba(0,0,0,0.04);
 }
-.card h2{
-  font-size:16px;
-  border-left:4px solid var(--accent);
-  padding-left:8px;
-  margin:0;
-  line-height:1.3;
-}
+.card h2{font-size:16px;border-left:4px solid var(--accent);padding-left:8px;margin:0;line-height:1.3;}
 
-/* Search area */
-.search-bar{
-  display:flex;
-  gap:6px;
-  width:100%;
-  position:relative;
-  flex-wrap:wrap;
-}
+.search-bar{display:flex;gap:6px;width:100%;position:relative;flex-wrap:wrap;}
 .search-bar input{
-  flex:1;
-  min-width:220px;
-  padding:10px 12px;
-  border:1px solid var(--border);
-  border-radius:6px;
-  font-size:15px;
-  outline:none;
-  transition:var(--transition);
-  background:#fff;
+  flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--border);
+  border-radius:6px;font-size:15px;outline:none;transition:var(--transition);background:#fff;
 }
 .search-bar input:focus{
   border-color:var(--accent);
   box-shadow:0 0 0 2px rgba(47,95,161,0.15);
 }
 .search-bar button{
-  background:var(--accent);
-  color:#fff;
-  border:1px solid var(--accent);
-  border-radius:6px;
-  padding:10px 16px;
-  font-size:14px;
-  cursor:pointer;
-  font-weight:500;
-  transition:var(--transition);
+  background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:6px;
+  padding:10px 16px;font-size:14px;cursor:pointer;font-weight:500;transition:var(--transition);
 }
 .search-bar button:hover{background:var(--accent-hover);}
-.suggestion-wrapper{
-  position:relative;
-  width:100%;
-}
+.suggestion-wrapper{position:relative;width:100%;}
 #acupoint-suggestion-list{
-  list-style:none;
-  background:#fff;
-  margin:4px 0 0;
-  padding:4px 0;
-  border:1px solid var(--border);
-  border-radius:6px;
-  max-height:340px;
-  overflow-y:auto;
-  font-size:14px;
-  box-shadow:0 6px 20px rgba(0,0,0,0.14);
-  position:absolute;
-  z-index:50;
-  width:100%;
+  list-style:none;background:#fff;margin:4px 0 0;padding:4px 0;
+  border:1px solid var(--border);border-radius:6px;max-height:340px;overflow-y:auto;
+  font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,0.18);position:absolute;z-index:1500;width:100%;
 }
 #acupoint-suggestion-list.hidden{display:none;}
 #acupoint-suggestion-list li{
-  padding:6px 10px 6px 12px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  gap:6px;
-  position:relative;
+  padding:6px 10px 6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px;position:relative;
 }
 #acupoint-suggestion-list li.active,
-#acupoint-suggestion-list li:hover{
-  background:#eef5ff;
-}
-#acupoint-suggestion-list li .sug-name{
-  font-weight:600;
-  letter-spacing:.5px;
-}
-#acupoint-suggestion-list li .sug-name.important{
-  color:#b45309;
-}
-#acupoint-suggestion-list li .sug-reading{
-  color:#555;
-  font-size:12px;
-}
-#acupoint-suggestion-list li .sug-slash{
-  color:#999;
-  font-size:11px;
-}
-#acupoint-suggestion-list li .sug-badges{
-  margin-left:auto;
-  display:flex;
-  gap:4px;
-  font-size:11px;
-}
-.badge{
-  background:#e2e8f0;
-  border-radius:3px;
-  padding:2px 4px;
-  line-height:1;
-  font-weight:600;
-  font-size:10px;
-  color:#333;
-}
-.badge-important{
-  background:#f59e0b;
-  color:#fff;
-}
-/* Result panel */
+#acupoint-suggestion-list li:hover{background:#eef5ff;}
+#acupoint-suggestion-list li .sug-name{font-weight:600;letter-spacing:.5px;}
+#acupoint-suggestion-list li .sug-name.important{color:#b45309;}
+#acupoint-suggestion-list li .sug-reading{color:#555;font-size:12px;}
+#acupoint-suggestion-list li .sug-slash{color:#999;font-size:11px;}
+#acupoint-suggestion-list li .sug-badges{margin-left:auto;display:flex;gap:4px;font-size:11px;}
+.badge{background:#e2e8f0;border-radius:3px;padding:2px 4px;line-height:1;font-weight:600;font-size:10px;color:#333;}
+.badge-important{background:#f59e0b;color:#fff;}
+
 #inline-acupoint-result.hidden{display:none;}
 .result-grid{
-  display:grid;
-  gap:10px;
-  grid-template-columns: 90px 1fr;
-  font-size:14px;
+  display:grid;gap:10px;grid-template-columns:90px 1fr;font-size:14px;
 }
-.result-grid dt{
-  font-weight:600;
-  color:#444;
-  line-height:1.4;
-}
-.result-grid dd{
-  margin:0;
-  line-height:1.4;
-  word-break:break-word;
-}
+.result-grid dt{font-weight:600;color:#444;line-height:1.4;}
+.result-grid dd{margin:0;line-height:1.4;word-break:break-word;}
 .acu-important-flag{
-  display:inline-block;
-  background:#f59e0b;
-  color:#fff;
-  font-size:11px;
-  padding:2px 6px;
-  border-radius:4px;
-  font-weight:600;
+  display:inline-block;background:#f59e0b;color:#fff;font-size:11px;padding:2px 6px;
+  border-radius:4px;font-weight:600;
 }
 .treat-point-link{
-  color:#0b63c7;
-  text-decoration:none;
-  border-bottom:1px dotted #0b63c7;
-  cursor:pointer;
+  color:#0b63c7;text-decoration:none;border-bottom:1px dotted #0b63c7;cursor:pointer;
 }
-.treat-point-link:hover{
-  color:#094a93;
-  border-bottom-color:#094a93;
-}
-.treat-point-link.acu-important{
-  color:#b45309;
-  border-bottom-color:#b45309;
-  font-weight:600;
-}
-.treat-point-link.treat-point-unknown{
-  color:#666;
-  border-bottom:1px dotted #888;
-}
-#related-symptoms{
-  margin:4px 0 0;
-  padding-left:18px;
-}
-#related-symptoms li{ margin:3px 0; font-size:13px; }
-.bui-red{ color:#b91c1c; font-weight:600; }
+.treat-point-link:hover{color:#094a93;border-bottom-color:#094a93;}
+.treat-point-link.acu-important{color:#b45309;border-bottom-color:#b45309;font-weight:600;}
+.treat-point-link.treat-point-unknown{color:#666;border-bottom:1px dotted #888;}
+#related-symptoms{margin:4px 0 0;padding-left:18px;}
+#related-symptoms li{margin:3px 0;font-size:13px;}
+.bui-red{color:#b91c1c;font-weight:600;}
 
-/* Clinical pattern */
-.pattern-selectors{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
+.pattern-selectors{display:flex;gap:8px;flex-wrap:wrap;}
 .pattern-selectors select{
-  padding:8px 10px;
-  font-size:14px;
-  border:1px solid var(--border);
-  border-radius:6px;
-  background:#fff;
-  min-width:190px;
+  padding:8px 10px;font-size:14px;border:1px solid var(--border);border-radius:6px;
+  background:#fff;min-width:190px;
 }
 #clinical-treatment-result.hidden{display:none;}
 #clinical-selected-title{
-  font-size:15px;
-  font-weight:600;
-  margin:0 0 8px;
-  padding:4px 8px;
-  background:#eef2f7;
-  border-radius:6px;
-  word-break:break-word;
+  font-size:15px;font-weight:600;margin:0 0 8px;padding:4px 8px;background:#eef2f7;
+  border-radius:6px;word-break:break-word;
 }
-.pattern-name-highlight{
-  color:#1d4ed8;
-}
+.pattern-name-highlight{color:#1d4ed8;}
 .treat-line{
-  background:#fff;
-  border:1px solid #e2e8f0;
-  border-radius:6px;
-  padding:10px 12px;
-  margin-bottom:10px;
-  box-shadow:0 1px 2px rgba(0,0,0,0.06);
+  background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;
+  margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);
 }
-.treat-line .treat-main{
-  margin:0 0 5px;
-  font-size:14px;
-  line-height:1.5;
-  word-break:break-word;
-}
-.treat-line .treat-comment{
-  margin:0;
-  font-size:12px;
-  color:#555;
-  font-style:italic;
-}
+.treat-line .treat-main{margin:0 0 5px;font-size:14px;line-height:1.5;word-break:break-word;}
+.treat-line .treat-comment{margin:0;font-size:12px;color:#555;font-style:italic;}
 
-/* Footer or minor */
 footer{
-  margin:50px auto 60px;
-  max-width:900px;
-  text-align:center;
-  font-size:12px;
-  color:#666;
+  margin:50px auto 60px;max-width:900px;text-align:center;font-size:12px;color:#666;
   padding:0 20px;
 }
 footer a{color:#666;}
 footer a:hover{color:#333;text-decoration:underline;}
 
-/* History Dropdown (injected separately originally; integrated here) */
-#history-dropdown-wrapper {
-  position: relative;
-  display: inline-block;
-  margin-left:8px;
-  font-size:14px;
-  z-index:1100;
+/* History Dropdown */
+#history-dropdown-wrapper{position:relative;display:inline-block;margin-left:8px;font-size:14px;z-index:400;}
+#history-toggle-btn{
+  background:#2f5fa1;color:#fff;border:1px solid #2f5fa1;padding:6px 12px;border-radius:6px;
+  cursor:pointer;font-size:13px;transition:var(--transition);
 }
-#history-toggle-btn {
-  background:#2f5fa1;
-  color:#fff;
-  border:1px solid #2f5fa1;
-  padding:6px 12px;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:13px;
-  transition:var(--transition);
-}
-#history-toggle-btn:hover { background:#3e72c0; }
-#history-panel {
-  position:absolute;
-  top:115%;
-  right:0;
-  width:340px;
-  max-height:420px;
-  background:#fff;
-  border:1px solid #ccc;
-  box-shadow:0 4px 14px rgba(0,0,0,0.18);
-  border-radius:6px;
-  padding:8px 8px 6px;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
+#history-toggle-btn:hover{background:#3e72c0;}
+#history-panel{
+  position:absolute;top:115%;right:0;width:340px;max-height:420px;background:#fff;
+  border:1px solid #ccc;box-shadow:0 4px 14px rgba(0,0,0,0.18);border-radius:6px;
+  padding:8px 8px 6px;display:flex;flex-direction:column;gap:6px;z-index:1600;
 }
 #history-panel.hist-hidden{display:none;}
-.hist-panel-head{
-  display:flex;
-  gap:6px;
-  align-items:center;
-}
+.hist-panel-head{display:flex;gap:6px;align-items:center;}
 #history-filter{
-  flex:1;
-  padding:4px 6px;
-  border:1px solid #bbb;
-  border-radius:4px;
-  font-size:13px;
+  flex:1;padding:4px 6px;border:1px solid #bbb;border-radius:4px;font-size:13px;
 }
 #history-close-btn{
-  background:#eee;
-  border:1px solid #bbb;
-  border-radius:4px;
-  cursor:pointer;
-  width:34px;
-  height:30px;
-  font-size:16px;
-  line-height:1;
+  background:#eee;border:1px solid #bbb;border-radius:4px;cursor:pointer;
+  width:34px;height:30px;font-size:16px;line-height:1;
 }
 #history-close-btn:hover{background:#ddd;}
 #history-list{
-  list-style:none;
-  margin:0;
-  padding:0;
-  overflow-y:auto;
-  flex:1;
-  font-size:13px;
-  line-height:1.3;
+  list-style:none;margin:0;padding:0;overflow-y:auto;flex:1;font-size:13px;line-height:1.3;
 }
 #history-list li{
-  padding:4px 6px 5px;
-  border-bottom:1px solid #eee;
-  cursor:pointer;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
+  padding:4px 6px 5px;border-bottom:1px solid #eee;cursor:pointer;
+  display:flex;flex-direction:column;gap:2px;
 }
 #history-list li:last-child{border-bottom:none;}
 #history-list li:hover{background:#f5f9ff;}
 #history-list li.active{background:#d9ecff;}
-.hist-item-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  font-weight:600;
-  font-size:12px;
-}
-.hist-item-label{
-  font-weight:500;
-  color:#222;
-  word-break:break-all;
-}
+.hist-item-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:12px;}
+.hist-item-label{font-weight:500;color:#222;word-break:break-all;}
 .hist-item-type{
-  font-size:10px;
-  padding:1px 4px;
-  background:#e2e8f0;
-  border-radius:3px;
-  color:#333;
-  margin-left:4px;
+  font-size:10px;padding:1px 4px;background:#e2e8f0;border-radius:3px;color:#333;margin-left:4px;
 }
-.hist-time{
-  font-size:10px;
-  color:#666;
-}
+.hist-time{font-size:10px;color:#666;}
 .hist-footer{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  font-size:11px;
-  border-top:1px solid #eee;
-  padding-top:4px;
+  display:flex;justify-content:space-between;align-items:center;font-size:11px;
+  border-top:1px solid #eee;padding-top:4px;
 }
 .hist-clear-btn{
-  background:#f7e0e0;
-  border:1px solid #e5b5b5;
-  color:#a33;
-  padding:2px 8px;
-  border-radius:4px;
-  cursor:pointer;
-  font-size:11px;
+  background:#f7e0e0;border:1px solid #e5b5b5;color:#a33;padding:2px 8px;border-radius:4px;
+  cursor:pointer;font-size:11px;
 }
 .hist-clear-btn:hover{background:#f3caca;}
-/* Scrollbar styling (optional) */
-#history-list::-webkit-scrollbar,
-#acupoint-suggestion-list::-webkit-scrollbar{
-  width:10px;
+
+#history-list::-webkit-scrollbar,#acupoint-suggestion-list::-webkit-scrollbar{width:10px;}
+#history-list::-webkit-scrollbar-track,#acupoint-suggestion-list::-webkit-scrollbar-track{
+  background:#f2f4f6;border-radius:0 6px 6px 0;
 }
-#history-list::-webkit-scrollbar-track,
-#acupoint-suggestion-list::-webkit-scrollbar-track{
-  background:#f2f4f6;
-  border-radius:0 6px 6px 0;
+#history-list::-webkit-scrollbar-thumb,#acupoint-suggestion-list::-webkit-scrollbar-thumb{
+  background:#c1ccd8;border-radius:6px;border:2px solid #f2f4f6;
 }
-#history-list::-webkit-scrollbar-thumb,
-#acupoint-suggestion-list::-webkit-scrollbar-thumb{
-  background:#c1ccd8;
-  border-radius:6px;
-  border:2px solid #f2f4f6;
-}
-#history-list::-webkit-scrollbar-thumb:hover,
-#acupoint-suggestion-list::-webkit-scrollbar-thumb:hover{
+#history-list::-webkit-scrollbar-thumb:hover,#acupoint-suggestion-list::-webkit-scrollbar-thumb:hover{
   background:#aab5c0;
 }
 </style>
@@ -489,19 +200,14 @@ footer a:hover{color:#333;text-decoration:underline;}
   <div class="header-left">
     <div class="header-title">経穴検索 & 臨床病証ビューア</div>
     <div class="nav-buttons">
-      <button id="home-btn" title="Home (初期状態に戻る)">Home</button>
-      <button id="back-btn" title="戻る (ブラウザ履歴)">←</button>
-      <button id="forward-btn" title="進む (ブラウザ履歴)">→</button>
+      <button id="home-btn" title="ホームへ戻る">Home</button>
+      <button id="back-btn" title="戻る">←</button>
+      <button id="forward-btn" title="進む">→</button>
     </div>
   </div>
   <div id="status-float">
-    <div class="status-chip">
-      <span id="data-load-status">経穴CSV: -</span>
-    </div>
-    <div class="status-chip">
-      <span id="clinical-load-status">臨床CSV: -</span>
-    </div>
-    <!-- 履歴ドロップダウン -->
+    <div class="status-chip"><span id="data-load-status">経穴CSV: -</span></div>
+    <div class="status-chip"><span id="clinical-load-status">臨床CSV: -</span></div>
     <div id="history-dropdown-wrapper">
       <button id="history-toggle-btn" type="button" aria-expanded="false" aria-controls="history-panel">履歴</button>
       <div id="history-panel" class="hist-hidden" role="listbox" aria-label="閲覧履歴">
@@ -521,11 +227,13 @@ footer a:hover{color:#333;text-decoration:underline;}
 
 <main>
   <div class="cards-grid">
-    <!-- Search Card -->
     <div class="card" id="search-card">
       <h2>経穴検索</h2>
       <div class="search-bar">
-        <input id="acupoint-search-input" type="text" placeholder="経穴名 / 読み / 筋肉・神経・血管一部..." autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" />
+        <input id="acupoint-search-input" type="text"
+               placeholder="経穴名 / 読み / 筋肉・神経・血管の一部..."
+               autocomplete="off" aria-autocomplete="list"
+               aria-haspopup="listbox" aria-expanded="false" />
         <button id="search-btn" type="button">検索</button>
         <div class="suggestion-wrapper">
           <ul id="acupoint-suggestion-list" class="hidden" role="listbox" aria-label="候補リスト"></ul>
@@ -551,7 +259,6 @@ footer a:hover{color:#333;text-decoration:underline;}
       </section>
     </div>
 
-    <!-- Symptom / Pattern Card -->
     <div class="card" id="symptom-card">
       <h2>臨床 病証 / 治療方針</h2>
       <div class="pattern-selectors">
@@ -573,13 +280,9 @@ footer a:hover{color:#333;text-decoration:underline;}
 </main>
 
 <footer>
-  <p>
-    &copy; 2025 Acupuncture Demo.  
-    データは学習/参照用。医療行為判断は専門家の指示に従ってください。
-  </p>
+  <p>&copy; 2025 Acupuncture Demo. データは学習/参照用。医療判断は専門家に従ってください。</p>
 </footer>
 
-<!-- データ読み込み用CSVはルートに配置: 経穴・経絡.csv / 東洋臨床論.csv -->
-<script src="app.js?v=20250922-NAV-LINK-HOTFIX6-REVERT-LINK+HIST-DROP"></script>
+<script src="app.js?v=20250922-FIX-FREEZE-SUGGEST-DROP"></script>
 </body>
 </html>
