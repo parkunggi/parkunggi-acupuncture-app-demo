@@ -2,12 +2,14 @@
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ表示
  * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX-IMG
  *
- * 追加修正(今回):
- *  - 治療方針(治法)セクションの sticky を解除（CSSで position:static 済み）
- *  - 右カラム下に経絡イメージ表示セクション (#meridian-image-section) を追加
- *  - 経穴詳細表示時、経絡名と同名の "<経絡名>.png" を自動読み込みして表示 (存在しなければ非表示)
- *  - 履歴適用/ホーム/未登録表示/パターン表示時にイメージを適切に隠す
- * 他コードは既存最小変更のみ
+ * 今回追加変更:
+ *  - レイアウト仕様(PC):
+ *      右カラム上: 治療方針(表示時のみ) / 右カラム最下部: 経絡イメージ(常に下固定, 治療方針非表示でも繰り上げない)
+ *  - モバイル(幅 <= 860px)時の順序:
+ *      検索 → 症状 → 治療方針(あれば) → 経穴詳細 → 経絡イメージ（最後）
+ *  - パターン表示時に経絡イメージを隠さない（以前は hideMeridianImage() を実行していた）
+ *  - パターン表示時も経穴詳細を消さない（以前は inlineAcupointResult を hidden にしていた）
+ *  - 既存高さ調整ロジックは基本維持
  ******************************************************/
 const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX-IMG';
 
@@ -67,6 +69,10 @@ const historyBtn = document.getElementById('history-btn');
 const historyMenu = document.getElementById('history-menu');
 const historyMenuList = document.getElementById('history-menu-list');
 
+/* レイアウト再配置用参照 (モバイル順序対応) */
+const leftInner = document.getElementById('left-inner');
+const rightColumn = document.getElementById('right-column');
+
 /* ================= History ================= */
 let historyStack = [];
 let historyIndex = -1;
@@ -117,8 +123,7 @@ function applyState(state){
         showUnknownPoint(state.name,true);
         break;
       case 'pattern':
-        inlineAcupointResult.classList.add('hidden');
-        hideMeridianImage();
+        // 以前はここで inlineAcupointResult.classList.add('hidden'); hideMeridianImage(); をしていたが仕様変更で削除
         if(CLINICAL_READY){
           if(state.cat){
             categorySelect.value=state.cat;
@@ -493,21 +498,21 @@ function parseClinicalCSV(raw){
           i++;
         } else {
           const next=table[i+1]||[];
-          const commentRow=isPotentialCommentRow(next)? next:null;
-          patternNames.forEach((pName,idx)=>{
-            const col=idx+1;
-            const cell=r[col]||'';
-            if(!cell) return;
-            const {label,rawPoints,comment}=dissectTreatmentCell(cell);
-            if(!label && !rawPoints) return;
-            let finalComment=comment;
-            if(!finalComment && commentRow){
-              const cc=commentRow[col]||'';
-              if(/^[（(]/.test(cc)) finalComment=cc;
-            }
-            data.cats[category].patterns[pName].push({label,rawPoints,comment:finalComment});
-          });
-          i+= commentRow?2:1;
+            const commentRow=isPotentialCommentRow(next)? next:null;
+            patternNames.forEach((pName,idx)=>{
+              const col=idx+1;
+              const cell=r[col]||'';
+              if(!cell) return;
+              const {label,rawPoints,comment}=dissectTreatmentCell(cell);
+              if(!label && !rawPoints) return;
+              let finalComment=comment;
+              if(!finalComment && commentRow){
+                const cc=commentRow[col]||'';
+                if(/^[（(]/.test(cc)) finalComment=cc;
+              }
+              data.cats[category].patterns[pName].push({label,rawPoints,comment:finalComment});
+            });
+            i+= commentRow?2:1;
         }
       }
       continue;
@@ -566,7 +571,6 @@ function equalizeTopCards(){
   const maxH=Math.max(searchCard.scrollHeight, symptomCard.scrollHeight);
   searchCard.style.height=maxH+'px';
   symptomCard.style.height=maxH+'px';
-  // 高さ同期は維持するが sticky は CSS で解除済み
   if(!clinicalResultEl.classList.contains('hidden')){
     clinicalResultEl.style.height = searchCard.offsetHeight + 'px';
   } else {
@@ -688,14 +692,14 @@ function linkifyRegionAcupoints(html){
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
           const a=document.createElement('a');
-            a.href='#';
-            a.className='treat-point-link';
-            const p=findAcupointByToken(matched);
-            if(p && p.important) a.classList.add('acu-important');
-            a.dataset.point=matched;
-            a.textContent=matched;
-            frag.appendChild(a);
-            i+=len; cursor=i;
+          a.href='#';
+          a.className='treat-point-link';
+          const p=findAcupointByToken(matched);
+          if(p && p.important) a.classList.add('acu-important');
+          a.dataset.point=matched;
+          a.textContent=matched;
+          frag.appendChild(a);
+          i+=len; cursor=i;
         } else i++;
       }
       if(cursor<work.length) frag.appendChild(document.createTextNode(work.slice(cursor)));
@@ -749,7 +753,6 @@ function showPointDetail(p, suppressHistory=false){
   } else resultImportantEl.textContent='-';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
-  // 経絡イメージ更新
   updateMeridianImage(p.meridian||'');
   if(!suppressHistory && !IS_APPLYING_HISTORY){
     pushState({type:'point',name:p.name});
@@ -1033,6 +1036,81 @@ init();
     mo.observe(container,{childList:true,subtree:true,characterData:true});
     patch();
   });
+})();
+
+/* ================= レスポンシブ再配置 (検索 → 症状 → 治療方針 → 経穴詳細 → 経絡イメージ) ================= */
+(function responsiveRelayout(){
+  const BREAKPOINT=860;
+  if(!leftInner || !clinicalResultEl || !inlineAcupointResult || !meridianImageSection) return;
+
+  const original = {
+    treatmentParent: clinicalResultEl.parentElement,
+    treatmentNext: clinicalResultEl.nextElementSibling,
+    meridianParent: meridianImageSection.parentElement,
+    meridianNext: meridianImageSection.nextElementSibling,
+    acupointParent: inlineAcupointResult.parentElement,
+    acupointNext: inlineAcupointResult.nextElementSibling
+  };
+
+  let isMobile=false;
+
+  function moveToMobile(){
+    // 順序: 検索(既存) → 症状(既存) → 治療方針 → 経穴詳細 → 経絡イメージ
+    const symptom = symptomCard;
+    if(symptom && clinicalResultEl.parentElement!==leftInner){
+      leftInner.insertBefore(clinicalResultEl, symptom.nextElementSibling);
+    }
+    if(clinicalResultEl.nextElementSibling !== inlineAcupointResult){
+      if(inlineAcupointResult.parentElement !== leftInner){
+        leftInner.appendChild(inlineAcupointResult);
+      }
+      leftInner.insertBefore(inlineAcupointResult, clinicalResultEl.nextElementSibling);
+    }
+    // 経絡イメージは経穴詳細の後
+    if(inlineAcupointResult.nextElementSibling !== meridianImageSection){
+      if(meridianImageSection.parentElement !== leftInner){
+        leftInner.appendChild(meridianImageSection);
+      }
+      leftInner.insertBefore(meridianImageSection, inlineAcupointResult.nextElementSibling);
+    }
+  }
+
+  function restoreDesktop(){
+    // 経穴詳細
+    if(inlineAcupointResult.parentElement!==original.acupointParent){
+      if(original.acupointNext){
+        original.acupointParent.insertBefore(inlineAcupointResult, original.acupointNext);
+      } else original.acupointParent.appendChild(inlineAcupointResult);
+    }
+    // 治療方針
+    if(clinicalResultEl.parentElement!==original.treatmentParent){
+      if(original.treatmentNext){
+        original.treatmentParent.insertBefore(clinicalResultEl, original.treatmentNext);
+      } else original.treatmentParent.appendChild(clinicalResultEl);
+    }
+    // 経絡イメージ
+    if(meridianImageSection.parentElement!==original.meridianParent){
+      if(original.meridianNext){
+        original.meridianParent.insertBefore(meridianImageSection, original.meridianNext);
+      } else original.meridianParent.appendChild(meridianImageSection);
+    }
+  }
+
+  function handle(){
+    const mobile = window.innerWidth <= BREAKPOINT;
+    if(mobile && !isMobile){
+      isMobile=true;
+      moveToMobile();
+    } else if(!mobile && isMobile){
+      isMobile=false;
+      restoreDesktop();
+    }
+  }
+
+  window.addEventListener('resize', handle);
+  window.addEventListener('orientationchange', handle);
+  document.addEventListener('DOMContentLoaded', handle);
+  handle();
 })();
 
 /* ================= 履歴ドロップダウン ================= */
