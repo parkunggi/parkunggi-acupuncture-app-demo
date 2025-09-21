@@ -1,11 +1,12 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 神経/血管 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX4+CSV-PARSER
- * 追加:
- *  - parseAcuCSV 実装復元
- *  - コメントで列仕様を明記
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX4-CSVFIX
+ * 追加修正:
+ *  - CSV（経絡,経穴,部位,要穴 の4列）用 parseAcuCSV を再実装
+ *  - カテゴリ行 & ヘッダ行スキップ
+ *  - 361件に正規化
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX4';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX4-CSVFIX';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -112,7 +113,7 @@ function applyState(state){
             categorySelect.value=state.cat;
             categorySelect.dispatchEvent(new Event('change'));
           }
-            if(state.pattern){
+          if(state.pattern){
             patternSelect.value=state.pattern;
             patternSelect.dispatchEvent(new Event('change'));
           }
@@ -181,26 +182,22 @@ function transformPatternDisplay(original){
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
 
-/* ==== CSV (経穴) パーサ ==== */
-/**
- * 想定カラム順:
- * 0: 経穴名
- * 1: 読み (任意)
- * 2: 経絡
- * 3: 部位 (region)
- * 4: 要穴 (important)
- * 5: 筋肉 (muscle)
- * 6: 神経 (nerve)
- * 7: 血管 (vessel)
- * 以降は無視。ヘッダ行(経穴名 等を含む)はスキップ。
- * 補完: 読み/筋肉/神経/血管はマップで空欄を補う( CSV > MAP )。
+/* ================= 経穴CSVパーサ (4列仕様) =================
+ * CSV列: 経絡,経穴,部位,要穴
+ *  - カテゴリ行: "1.督脈" のようにカンマ無し → スキップ
+ *  - ヘッダ行: 先頭2列が 経絡,経穴 → スキップ
+ *  - 経絡 or 経穴 欠落行 → スキップ
+ * 補完: reading/muscle/nerve/vessel はマップから
  */
 function parseAcuCSV(raw){
   if(!raw) return [];
   const text = raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
   const lines = text.split('\n').filter(l=>l.trim().length>0);
 
-  function splitCSVLine(line){
+  function splitLine(line){
+    // 引用符ない前提（なければ高速 split）
+    if(!line.includes('"')) return line.split(',').map(c=>c.trim());
+    // 簡易クォート対応
     const out=[]; let cur=''; let inQ=false;
     for(let i=0;i<line.length;i++){
       const ch=line[i];
@@ -210,48 +207,44 @@ function parseAcuCSV(raw){
         continue;
       }
       if(ch===',' && !inQ){
-        out.push(cur);
-        cur='';
+        out.push(cur); cur='';
       } else cur+=ch;
     }
     out.push(cur);
     return out.map(c=>c.trim());
   }
 
-  const rows = lines.map(splitCSVLine);
   const results=[];
-  rows.forEach(cols=>{
-    if(!cols.length) return;
-    const c0=cols[0];
-    if(/経穴名/.test(c0) || c0==='name') return; // ヘッダ
-    const name = trimOuter(c0);
-    if(!name) return;
+  for(const rawLine of lines){
+    if(/^[0-9０-９]+\./.test(rawLine.trim())) continue; // カテゴリ
+    const cols = splitLine(rawLine);
+    if(cols.length===0) continue;
+    // 4列未満でも構造崩れとしてスキップ
+    if(cols[0]==='経絡' && cols[1]==='経穴') continue; // ヘッダ
+    if(cols.length < 2) continue;
+    const meridian = trimOuter(cols[0]);
+    const name     = trimOuter(cols[1]);
+    if(!meridian || !name) continue;
+    const region   = cols[2]? cols[2].trim() : '';
+    const important= cols[3]? cols[3].trim() : '';
 
-    const readingCSV = cols[1]||'';
-    const meridian   = cols[2]||'';
-    const region     = cols[3]||'';
-    const important  = cols[4]||'';
-    const muscleCSV  = cols[5]||'';
-    const nerveCSV   = cols[6]||'';
-    const vesselCSV  = cols[7]||'';
-
-    const reading = readingCSV || READINGS[name] || '';
-    const muscle  = muscleCSV  || MUSCLE_MAP[name] || '';
-    const nerve   = nerveCSV   || NERVE_MAP[name]   || '';
-    const vessel  = vesselCSV  || VESSEL_MAP[name]  || '';
+    const reading  = READINGS[name] || '';
+    const muscle   = MUSCLE_MAP[name] || '';
+    const nerve    = NERVE_MAP[name] || '';
+    const vessel   = VESSEL_MAP[name] || '';
 
     results.push({
       name,
       reading,
       meridian,
       region,
-      regionRaw: region,  // [[ ]] の元保存
+      regionRaw: region,
       important,
       muscle,
       nerve,
       vessel
     });
-  });
+  }
   return results;
 }
 
@@ -327,12 +320,10 @@ function linkifyParenthesisGroup(group){
   }
   return escapeHTML(open)+out+escapeHTML(close);
 }
-
 function buildPointsHTML(rawPoints, tokens){
   if(!rawPoints) return '';
   const uniqueTokens = Array.from(new Set(tokens||[]));
   const sortedTokens = uniqueTokens.sort((a,b)=> b.length - a.length);
-
   let i=0, out='', len=rawPoints.length;
   while(i<len){
     const ch=rawPoints[i];
@@ -370,6 +361,7 @@ function buildPointsHTML(rawPoints, tokens){
 }
 
 /* ================= Clinical CSV パース関連 ================= */
+/* (以下 臨床CSV 部分は既存そのまま) */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -509,7 +501,7 @@ function parseClinicalCSV(raw){
           i++;
         } else {
           const next=table[i+1]||[];
-            const commentRow=isPotentialCommentRow(next)? next:null;
+          const commentRow=isPotentialCommentRow(next)? next:null;
           patternNames.forEach((pName,idx)=>{
             const col=idx+1;
             const cell=r[col]||'';
@@ -552,9 +544,9 @@ function rebuildAcuPointPatternIndex(){
       groups.forEach(g=>{
         (g.tokens||[]).forEach(tk=>{
           if(!tk || seen.has(tk)) return;
-          seen.add(tk);
-          if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
-          ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
+            seen.add(tk);
+            if(!ACUPOINT_PATTERN_INDEX[tk]) ACUPOINT_PATTERN_INDEX[tk]=[];
+            ACUPOINT_PATTERN_INDEX[tk].push({cat,pattern:pat});
         });
       });
     });
@@ -594,20 +586,20 @@ function filterPoints(qInput){
   }
   const nm=[]; const seen=new Set();
   for(const p of ACUPOINTS){
-    if(p.name.includes(q)){ nm.push({...p,_matchType:'name'}); seen.add(p.id); }
+    if(p.name.includes(q)){ nm.push({...p._matchType? p:{...p,_matchType:'name'}}); seen.add(p.name); }
   }
   const mm=[],nv=[],vs=[];
   for(const p of ACUPOINTS){
-    if(seen.has(p.id)) continue;
-    if(p.muscle && p.muscle.includes(q)){ mm.push({...p,_matchType:'muscle'}); seen.add(p.id); }
+    if(seen.has(p.name)) continue;
+    if(p.muscle && p.muscle.includes(q)){ mm.push({...p,_matchType:'muscle'}); seen.add(p.name); }
   }
   for(const p of ACUPOINTS){
-    if(seen.has(p.id)) continue;
-    if(p.nerve && p.nerve.includes(q)){ nv.push({...p,_matchType:'nerve'}); seen.add(p.id); }
+    if(seen.has(p.name)) continue;
+    if(p.nerve && p.nerve.includes(q)){ nv.push({...p,_matchType:'nerve'}); seen.add(p.name); }
   }
   for(const p of ACUPOINTS){
-    if(seen.has(p.id)) continue;
-    if(p.vessel && p.vessel.includes(q)){ vs.push({...p,_matchType:'vessel'}); seen.add(p.id); }
+    if(seen.has(p.name)) continue;
+    if(p.vessel && p.vessel.includes(q)){ vs.push({...p,_matchType:'vessel'}); seen.add(p.name); }
   }
   return nm.concat(mm,nv,vs);
 }
@@ -624,7 +616,7 @@ function setActive(items, idx){
   });
   if(items[idx]){
     items[idx].classList.add('active');
-    li.setAttribute('aria-selected','true');
+    items[idx].setAttribute('aria-selected','true');
     items[idx].scrollIntoView({block:'nearest'});
   }
 }
@@ -632,10 +624,10 @@ function renderSuggestions(list){
   suggestionListEl.innerHTML='';
   const qRaw=removeAllUnicodeSpaces(inputEl.value);
   const hira=isHiraganaOnly(qRaw)? qRaw:'';
-  const qRegex=hira? new RegExp(hira.replace(/([.*+?^=!:${}()|[\]\\])/g,'\\$1'),'g'):null;
+  const qRegex=hira? new RegExp(hira.replace(/([.*+?^=!:${}()|[\\]\\])/g,'\\$1'),'g'):null;
   list.slice(0,120).forEach((p,i)=>{
     const li=document.createElement('li');
-    li.dataset.id=p.id;
+    li.dataset.id=p.name; // name を一意キーに（id 無いので）
     li.dataset.matchType=p._matchType||'';
     li.setAttribute('role','option');
     li.setAttribute('aria-selected', i===0?'true':'false');
@@ -681,7 +673,7 @@ function handleSuggestionKeyboard(e){
     e.preventDefault();
     const act=items[current>=0?current:0];
     if(act && act.dataset.id){
-      const p=ACUPOINTS.find(x=>x.id===act.dataset.id);
+      const p=ACUPOINTS.find(x=>x.name===act.dataset.id);
       if(p) selectPoint(p);
     }
   } else if(e.key==='Escape'){ clearSuggestions(); }
@@ -741,7 +733,7 @@ function showPointDetail(p, suppressHistory=false){
   if(p.important){
     resultImportantEl.innerHTML=`<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
   } else resultImportantEl.textContent='-';
-  resultMuscleEl.textContent=p.muscle||'（筋肉未登録）';
+  resultMuscleEl.text内容=p.muscle||'（筋肉未登録）';
   resultNerveEl.textContent=p.nerve||'（神経未登録）';
   resultVesselEl.textContent=p.vessel||'（血管未登録）';
   renderRelatedPatterns(p.name);
@@ -947,18 +939,14 @@ async function loadAcuCSV(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const text=await res.text();
     let parsed=parseAcuCSV(text);
-    const nameCount={};
-    parsed=parsed.map(p=>{
-      nameCount[p.name]=(nameCount[p.name]||0)+1;
-      return {...p,id:nameCount[p.name]>1?`${p.name}__${nameCount[p.name]}`:p.name};
-    });
+    // 重複（同名出現）は単純に最初優先とし id=name
     ACUPOINTS=parsed;
     buildNameLookup();
     DATA_READY=true;
     const total=ACUPOINTS.length;
     statusEl.textContent=(total===EXPECTED_TOTAL)
-      ? `経穴CSV: ${total}件`
-      : `経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`;
+      ? `経穴CSV: ${total}件 / 想定${EXPECTED_TOTAL}`
+      : `経穴CSV: ${total}件 (想定${EXPECTED_TOTAL})`;
   }catch(err){
     console.error('[LOAD] acu error', err);
     statusEl.textContent='経穴CSV: 失敗 '+err.message;
