@@ -376,6 +376,3 @@ window.ACU_MUSCLE_MAP = {
   "章門":"第11肋骨端/腹横筋/腹斜筋",
   "期門":"第6肋間/腹直筋/外腹斜筋/前鋸筋"
 };
-// Nerve map placeholder (HOTFIX4)
-// Populate with: window.ACU_NERVE_MAP = { '〇〇': '△△', ... };
-window.ACU_NERVE_MAP = window.ACU_NERVE_MAP || {};
