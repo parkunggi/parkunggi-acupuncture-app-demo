@@ -36,7 +36,6 @@
   .nav-btn[disabled] { opacity:.4; cursor:not-allowed; }
   .nav-btn svg { width:18px; height:18px; fill:currentColor; }
 
-  /* 履歴ドロップダウン */
   #history-btn-wrapper { position:relative; }
   #history-menu {
     position:absolute; top:42px; right:0;
@@ -63,7 +62,7 @@
     display:grid;
     grid-template-columns:minmax(0,1fr) var(--right-col-width);
     gap:var(--gap);
-    align-items:start;
+    align-items:stretch;
   }
 
   .left-inner {
@@ -86,7 +85,7 @@
     margin:0 0 8px; font-size:.95rem; font-weight:600;
   }
 
-  /* 治療方針: sticky を解除 (要望) */
+  /* 治療方針: sticky 解除済 */
   #clinical-treatment-result {
     position:static;
     max-height:none;
@@ -205,24 +204,36 @@
   #status-float span { display:block; margin:0 0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #status-float span:last-child { margin-bottom:0; }
 
-  @media (max-width:860px) {
-    #main-screen { grid-template-columns:1fr; }
-    .left-inner {
-      grid-template-columns:1fr;
-      grid-template-areas:
-        "search"
-        "symptoms"
-        "result";
-    }
-    #clinical-treatment-result,
-    #meridian-image-section {
-      position:static;
-      max-height:none;
-      order:4;
-      margin-top:var(--gap);
-      height:auto !important;
-    }
+  /* 右カラム構造 */
+  #right-column {
+    display:flex;
+    flex-direction:column;
+    min-height:100%;
   }
+  #right-column .rc-spacer {
+    flex:1 1 auto;
+    pointer-events:none;
+  }
+
+  @media (max-width:860px) {
+    #main-screen {
+      grid-template-columns:1fr;
+    }
+    .left-inner {
+      display:flex;
+      flex-direction:column;
+      gap:var(--gap);
+    }
+    /* 右カラムそのものは幅1カラム化時には非レイアウト化 → JS で中身を移動する */
+    #right-column {
+      display:none; /* PC用構造を隠す（ノードはJSで移動/復元） */
+    }
+    #right-column .rc-spacer {
+      display:none;
+    }
+    /* モバイルでは自然な縦並び。順序は JS が DOM を組み替えて実現 */
+  }
+
 </style>
 
 <style id="bui-red-fix">
@@ -258,7 +269,7 @@
 </header>
 <main>
   <section id="main-screen">
-    <div class="left-inner">
+    <div class="left-inner" id="left-inner">
       <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
         <input id="acupoint-search-input" type="text"
@@ -296,16 +307,18 @@
       </div>
     </div>
 
-    <div id="clinical-treatment-result" class="clinical-result hidden" aria-live="polite">
-      <h2 id="clinical-selected-title" style="margin-top:0;">治療方針(治法)：<span class="pattern-name-highlight"></span></h2>
-      <div id="clinical-treatment-groups"></div>
-    </div>
-
-    <!-- 経絡イメージ（動的） -->
-    <div id="meridian-image-section" class="meridian-image-section hidden" aria-live="polite">
-      <h2>経絡イメージ</h2>
-      <div class="meridian-image-wrapper">
-        <img id="meridian-image" alt="" decoding="async">
+    <!-- 右カラム（PC用） -->
+    <div id="right-column">
+      <div id="clinical-treatment-result" class="clinical-result hidden" aria-live="polite">
+        <h2 id="clinical-selected-title" style="margin-top:0;">治療方針(治法)：<span class="pattern-name-highlight"></span></h2>
+        <div id="clinical-treatment-groups"></div>
+      </div>
+      <div class="rc-spacer" aria-hidden="true"></div>
+      <div id="meridian-image-section" class="meridian-image-section hidden" aria-live="polite">
+        <h2>経絡イメージ</h2>
+        <div class="meridian-image-wrapper">
+          <img id="meridian-image" alt="" decoding="async">
+        </div>
       </div>
     </div>
   </section>
