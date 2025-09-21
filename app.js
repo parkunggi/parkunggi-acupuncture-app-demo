@@ -1,14 +1,15 @@
 /******************************************************
- * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX
+ * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ表示
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX-IMG
  *
- * 今回追加修正（最小）:
- *  1) equalizeTopCards: 治療方針パネル高さを検索カード高さに合わせるよう変更
- *  2) applyState('pattern') で検索結果パネルを必ず非表示にし
- *     「point -> pattern」履歴戻り時に検索結果が残る不具合を解消
- * 他のロジックは変更なし
+ * 追加修正(今回):
+ *  - 治療方針(治法)セクションの sticky を解除（CSSで position:static 済み）
+ *  - 右カラム下に経絡イメージ表示セクション (#meridian-image-section) を追加
+ *  - 経穴詳細表示時、経絡名と同名の "<経絡名>.png" を自動読み込みして表示 (存在しなければ非表示)
+ *  - 履歴適用/ホーム/未登録表示/パターン表示時にイメージを適切に隠す
+ * 他コードは既存最小変更のみ
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-SWAP-HEIGHTFIX-HISTORYFIX-IMG';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -43,7 +44,6 @@ const resultNameEl      = document.getElementById('result-name');
 const resultMeridianEl  = document.getElementById('result-meridian');
 const resultRegionEl    = document.getElementById('result-region');
 const resultImportantEl = document.getElementById('result-important');
-
 const relatedSymptomsEl = document.getElementById('related-symptoms');
 
 const categorySelect = document.getElementById('clinical-category-select');
@@ -55,11 +55,14 @@ const clinicalGroupsEl = document.getElementById('clinical-treatment-groups');
 const searchCard  = document.getElementById('search-card');
 const symptomCard = document.getElementById('symptom-card');
 
+/* 経絡イメージ要素 */
+const meridianImageSection = document.getElementById('meridian-image-section');
+const meridianImageEl      = document.getElementById('meridian-image');
+
 const homeBtn = document.getElementById('home-btn');
 const backBtn = document.getElementById('back-btn');
 const forwardBtn = document.getElementById('forward-btn');
 
-/* 履歴ドロップダウン要素 */
 const historyBtn = document.getElementById('history-btn');
 const historyMenu = document.getElementById('history-menu');
 const historyMenuList = document.getElementById('history-menu-list');
@@ -114,8 +117,8 @@ function applyState(state){
         showUnknownPoint(state.name,true);
         break;
       case 'pattern':
-        // パターン表示時は検索結果パネルを必ず閉じる（履歴戻り異常対策）
         inlineAcupointResult.classList.add('hidden');
+        hideMeridianImage();
         if(CLINICAL_READY){
           if(state.cat){
             categorySelect.value=state.cat;
@@ -563,9 +566,8 @@ function equalizeTopCards(){
   const maxH=Math.max(searchCard.scrollHeight, symptomCard.scrollHeight);
   searchCard.style.height=maxH+'px';
   symptomCard.style.height=maxH+'px';
-
+  // 高さ同期は維持するが sticky は CSS で解除済み
   if(!clinicalResultEl.classList.contains('hidden')){
-    // 修正: 検索カードの高さに合わせる
     clinicalResultEl.style.height = searchCard.offsetHeight + 'px';
   } else {
     clinicalResultEl.style.height='';
@@ -605,7 +607,7 @@ function setActive(items, idx){
   });
   if(items[idx]){
     items[idx].classList.add('active');
-    li.setAttribute('aria-selected','true');
+    items[idx].setAttribute('aria-selected','true');
     items[idx].scrollIntoView({block:'nearest'});
   }
 }
@@ -686,14 +688,14 @@ function linkifyRegionAcupoints(html){
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
           const a=document.createElement('a');
-          a.href='#';
-          a.className='treat-point-link';
-          const p=findAcupointByToken(matched);
-          if(p && p.important) a.classList.add('acu-important');
-          a.dataset.point=matched;
-          a.textContent=matched;
-          frag.appendChild(a);
-          i+=len; cursor=i;
+            a.href='#';
+            a.className='treat-point-link';
+            const p=findAcupointByToken(matched);
+            if(p && p.important) a.classList.add('acu-important');
+            a.dataset.point=matched;
+            a.textContent=matched;
+            frag.appendChild(a);
+            i+=len; cursor=i;
         } else i++;
       }
       if(cursor<work.length) frag.appendChild(document.createTextNode(work.slice(cursor)));
@@ -705,6 +707,28 @@ function linkifyRegionAcupoints(html){
   }
   Array.from(wrapper.childNodes).forEach(process);
   return wrapper.innerHTML;
+}
+
+/* ================= 経絡イメージ ================= */
+function hideMeridianImage(){
+  if(meridianImageSection){
+    meridianImageSection.classList.add('hidden');
+    if(meridianImageEl){
+      meridianImageEl.removeAttribute('src');
+      meridianImageEl.alt='';
+    }
+  }
+}
+function updateMeridianImage(meridian){
+  if(!meridian || !meridianImageSection || !meridianImageEl){
+    hideMeridianImage(); return;
+  }
+  const fileName = meridian + '.png';
+  const url = encodeURI(fileName) + '?v=' + APP_VERSION;
+  meridianImageEl.onload = ()=>{ meridianImageSection.classList.remove('hidden'); };
+  meridianImageEl.onerror = ()=>{ hideMeridianImage(); };
+  meridianImageEl.alt = meridian;
+  meridianImageEl.src = url;
 }
 
 /* ================= 詳細表示 ================= */
@@ -725,6 +749,8 @@ function showPointDetail(p, suppressHistory=false){
   } else resultImportantEl.textContent='-';
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
+  // 経絡イメージ更新
+  updateMeridianImage(p.meridian||'');
   if(!suppressHistory && !IS_APPLYING_HISTORY){
     pushState({type:'point',name:p.name});
   }
@@ -750,6 +776,7 @@ function showUnknownPoint(name, suppressHistory=false){
   resultImportantEl.textContent='-';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   inlineAcupointResult.classList.remove('hidden');
+  hideMeridianImage();
   if(!suppressHistory && !IS_APPLYING_HISTORY){
     pushState({type:'unknownPoint',name});
   }
@@ -850,6 +877,7 @@ function goHome(suppressHistory=false){
   inputEl.value='';
   clearSuggestions();
   inlineAcupointResult.classList.add('hidden');
+  hideMeridianImage();
   categorySelect.value='';
   categorySelect.dispatchEvent(new Event('change'));
   patternSelect.value='';
