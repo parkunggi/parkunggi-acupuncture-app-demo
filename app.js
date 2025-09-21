@@ -1,14 +1,13 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX3
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX4
  *
- * IMGFIX3 変更点:
- *  - applyState('pattern') で inlineAcupointResult と経絡イメージを隠す
- *    (pattern → point → 戻る のケースで point を閉じ、pattern 残すため)
- *  - applyState('point'/'unknownPoint') では臨床結果を隠す (既存方針維持)
- *  - その他前版(IMGFIX2)の機能そのまま
+ * IMGFIX4 変更点:
+ *  - サジェスト内 要穴 (important) 色が黒になる誤りを修正（CSS 側変数誤記）
+ *  - 筋肉一致 "M" バッジ非表示（バッジ生成ロジック除去）
+ *  - 他コードは IMGFIX3 そのまま
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX3';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX4';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -111,8 +110,7 @@ function applyState(state){
       case 'point': {
         const p=ACUPOINTS.find(x=>x.name===state.name);
         if(p) showPointDetail(p,true); else showUnknownPoint(state.name,true);
-        // point 状態適用時は治療方針を閉じる
-        clinicalResultEl.classList.add('hidden');
+        clinicalResultEl.classList.add('hidden'); // point状態では治療方針を閉じる
         break;
       }
       case 'unknownPoint':
@@ -120,8 +118,7 @@ function applyState(state){
         clinicalResultEl.classList.add('hidden');
         break;
       case 'pattern':
-        // pattern 状態適用時は経穴詳細を閉じる（画像も隠す）
-        inlineAcupointResult.classList.add('hidden');
+        inlineAcupointResult.classList.add('hidden'); // pattern状態では経穴詳細を閉じる
         hideMeridianImage();
         if(CLINICAL_READY){
           if(state.cat){
@@ -197,7 +194,7 @@ function transformPatternDisplay(original){
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
 
-/* ========== CSV パース (経穴) ========== */
+/* ========== 経穴CSVパーサ ========== */
 function parseAcuCSV(raw){
   if(!raw) return [];
   const text = raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
@@ -616,7 +613,7 @@ function renderSuggestions(list){
     const important=!!p.important;
     const badges=[];
     if(important) badges.push('<span class="badge badge-important" title="要穴">★</span>');
-    if(p._matchType==='muscle') badges.push('<span class="badge badge-muscle" title="筋肉で一致">M</span>');
+    // 筋肉一致バッジ(M)を出さない: ここで追加しない
     const nameCls=important?'sug-name important':'sug-name';
     li.innerHTML=`
       <span class="${nameCls}">${escapeHTML(p.name)}</span>
