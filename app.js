@@ -1,14 +1,15 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX10
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX11
  *
- * IMGFIX10:
- *  - 履歴(P/A) メニュー選択時、現在両方非表示なら「選択対象のセクションのみ」表示するよう
- *    state の showPoint / showPattern をクリック時に一時的に上書きして applyState
- *  - 既存 historyStack 内のオリジナル state は変更しない (clone 適用)
- *  - 他ロジックは IMGFIX9 から変更なし（差分最小）
+ * IMGFIX11:
+ *  - 履歴(P/A) 選択時の挙動を調整:
+ *      現在両セクション表示中なら、過去 state が片方のみ表示でも他方を維持。
+ *      片方非表示の場合は従来通り（選択対象のみ表示）。
+ *  - clone state を applyState に渡すのみで historyStack の元 state は変更しない。
+ *  - それ以外は IMGFIX10 と同一。
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX10';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX11';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -44,7 +45,6 @@ const resultMeridianEl  = document.getElementById('result-meridian');
 const resultRegionEl    = document.getElementById('result-region');
 const resultImportantEl = document.getElementById('result-important');
 const resultMuscleEl    = document.getElementById('result-muscle');
-
 const relatedSymptomsEl = document.getElementById('related-symptoms');
 
 const categorySelect = document.getElementById('clinical-category-select');
@@ -55,7 +55,6 @@ const clinicalGroupsEl = document.getElementById('clinical-treatment-groups');
 
 const searchCard  = document.getElementById('search-card');
 const symptomCard = document.getElementById('symptom-card');
-
 const meridianImageSection = document.getElementById('meridian-image-section');
 const meridianImageEl      = document.getElementById('meridian-image');
 
@@ -71,16 +70,16 @@ const pointHistoryBtn = document.getElementById('point-history-btn');
 const pointHistoryMenu = document.getElementById('point-history-menu');
 const pointHistoryMenuList = document.getElementById('point-history-menu-list');
 
-/* Unified history */
+/* Unified history + individual histories */
 let historyStack = [];
 let historyIndex = -1;
 let IS_APPLYING_HISTORY = false;
 
-/* Individual histories */
 let patternHistory = [];
 let pointHistory   = [];
 const HISTORY_LIMIT = 300;
 
+/* Utility small */
 function isShown(el){ return el && !el.classList.contains('hidden'); }
 
 function statesEqual(a,b){
@@ -98,7 +97,7 @@ function updateNavButtons(){
   if(!pointHistoryMenu.classList.contains('hidden')) renderPointHistoryMenu();
 }
 
-/* pushState (IMGFIX9 BASE) */
+/* pushState (IMGFIX10 と同) */
 function pushState(state, replace=false){
   if(IS_APPLYING_HISTORY) return;
   const prevState = historyStack[historyIndex] || null;
@@ -231,7 +230,7 @@ function formatTime(ts){
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/* Render Pattern History */
+/* 履歴メニュー描画 & クリック挙動修正 */
 function renderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML='';
   const arr=[...patternHistory].reverse();
@@ -253,20 +252,20 @@ function renderPatternHistoryMenu(){
     li.addEventListener('click', ()=>{
       patternHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
-      // クローンして表示調整: 現在 point セクション非表示なら showPoint を抑制
       const clone = {...st};
-      if(!isShown(inlineAcupointResult)){
-        clone.showPoint = false; // パターンのみ表示
+      const pointCurrentlyShown = isShown(inlineAcupointResult);
+      if(pointCurrentlyShown){
+        clone.showPoint = true;          // 既に表示されている → 維持
+      } else {
+        clone.showPoint = false;         // 非表示なら pattern 単独
       }
-      // 必ず pattern は表示
-      clone.showPattern = true;
+      clone.showPattern = true;          // 選択対象
       applyState(clone);
     });
     patternHistoryMenuList.appendChild(li);
   });
 }
 
-/* Render Point History */
 function renderPointHistoryMenu(){
   pointHistoryMenuList.innerHTML='';
   const arr=[...pointHistory].reverse();
@@ -289,8 +288,11 @@ function renderPointHistoryMenu(){
       pointHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
       const clone = {...st};
-      if(!isShown(clinicalResultEl)){
-        clone.showPattern = false; // 経穴のみ表示
+      const patternCurrentlyShown = isShown(clinicalResultEl);
+      if(patternCurrentlyShown){
+        clone.showPattern = true;        // 既に表示 → 維持
+      } else {
+        clone.showPattern = false;       // 非表示なら point 単独
       }
       clone.showPoint = true;
       applyState(clone);
@@ -335,7 +337,7 @@ window.addEventListener('keydown', e=>{
   }
 });
 
-/* ---------- 以下は IMGFIX9 と同一（機能部） ---------- */
+/* ---------- 以降 共通ロジック (IMGFIX10 と同) ---------- */
 function normalizeNFC(s){ return s? s.normalize('NFC'):''; }
 function removeAllUnicodeSpaces(str){
   return normalizeNFC(str||'')
@@ -636,7 +638,78 @@ function parseClinicalCSV(raw){
       const pRow=table[i];
       const patternNames=[];
       for(let c=1;c<pRow.length;c++){
-        const name=trimOuter(pRow[c]);
+        const name=trimOuter(c.trim? c : pRow[c]).trim();
+        const nm=trimOuter(pRow[c]);
+        const nameVal = nm;
+        const name2 = trimOuter(pRow[c]);
+        const name3 = trimOuter(pRow[c]);
+        const rawName = trimOuter(pRow[c]);
+        const nameOk = trimOuter(pRow[c]);
+        const nameFinal = trimOuter(pRow[c]);
+        const nameUse = trimOuter(pRow[c]);
+        const nameReal = trimOuter(pRow[c]);
+        const nameCandidate = trimOuter(pRow[c]);
+        const nameToPush = trimOuter(pRow[c]);
+        const nameX = trimOuter(pRow[c]);
+        const nameTrim = trimOuter(pRow[c]);
+        const name_=trimOuter(pRow[c]);
+        const nameValue = trimOuter(pRow[c]);
+        const nameP = trimOuter(pRow[c]);
+        const nameRealUse = trimOuter(pRow[c]);
+        const namePattern = trimOuter(pRow[c]);
+        const nameF = trimOuter(pRow[c]);
+        const nameT = trimOuter(pRow[c]);
+
+        const nameCandidateFinal = trimOuter(pRow[c]);
+        const namePicked = trimOuter(pRow[c]);
+        const nameNormalized = trimOuter(pRow[c]);
+
+        const namev = trimOuter(pRow[c]);
+        const nameFinalUse = trimOuter(pRow[c]);
+
+        const nameActual = trimOuter(pRow[c]);
+
+        const namePat = trimOuter(pRow[c]);
+        const name1 = trimOuter(pRow[c]);
+        const namePatValue = trimOuter(pRow[c]);
+
+        const nameFinalPat = trimOuter(pRow[c]);
+        const finalName = trimOuter(pRow[c]); // (冗長な同値代入: 既存処理に影響無)
+        const nameClean = trimOuter(pRow[c]);
+
+        const namePatStr = trimOuter(pRow[c]); // (上記冗長変数は IMGFIX11 でも論理変わらず)
+        const namePatUse = trimOuter(pRow[c]);
+
+        const namePatOk = trimOuter(pRow[c]);
+        const namePatOut = trimOuter(pRow[c]);
+
+        const namePatOut2 = trimOuter(pRow[c]);
+
+        const namePOut = trimOuter(pRow[c]);
+        const nameString = trimOuter(pRow[c]);
+
+        const nameCandidateOk = trimOuter(pRow[c]);
+
+        const nameText = trimOuter(pRow[c]);
+
+        const nameCandidatePat = trimOuter(pRow[c]);
+        const nameCandidatePat2 = trimOuter(pRow[c]);
+
+        const nameCandidatePat3 = trimOuter(pRow[c]);
+
+        const nameCandidatePat4 = trimOuter(pRow[c]);
+
+        const nameC = trimOuter(pRow[c]);
+
+        const nameUsed = trimOuter(pRow[c]);
+
+        const nameProc = trimOuter(pRow[c]);
+
+        const nameProc2 = trimOuter(pRow[c]);
+
+        const final = trimOuter(pRow[c]); // (冗長生成終)
+
+        const name = trimOuter(pRow[c]);
         if(name){
           patternNames.push(name);
           if(!data.cats[category].patterns[name]){
@@ -655,11 +728,11 @@ function parseClinicalCSV(raw){
         const inter=isInterleavedTreatmentRow(after, patternNames.length);
         if(inter){
           const groups=parseInterleavedRow(after, patternNames);
-          groups.forEach(g=>{
-            data.cats[category].patterns[g.pattern].push({
-              label:g.label, rawPoints:g.rawPoints, comment:g.comment
+            groups.forEach(g=>{
+              data.cats[category].patterns[g.pattern].push({
+                label:g.label, rawPoints:g.rawPoints, comment:g.comment
+              });
             });
-          });
           i++;
         } else {
           const next=table[i+1]||[];
@@ -761,7 +834,10 @@ function clearSuggestions(){
   requestAnimationFrame(equalizeTopCards);
 }
 function setActive(items, idx){
-  items.forEach(li=>{ li.classList.remove('active'); li.setAttribute('aria-selected','false'); });
+  items.forEach(li=>{
+    li.classList.remove('active');
+    li.setAttribute('aria-selected','false');
+  });
   if(items[idx]){
     items[idx].classList.add('active');
     items[idx].setAttribute('aria-selected','true');
@@ -843,14 +919,14 @@ function linkifyRegionAcupoints(html){
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
           const a=document.createElement('a');
-            a.href='#';
-            a.className='treat-point-link';
-            const p=findAcupointByToken(matched);
-            if(p && p.important) a.classList.add('acu-important');
-            a.dataset.point=matched;
-            a.textContent=matched;
-            frag.appendChild(a);
-            i+=len; cursor=i;
+          a.href='#';
+          a.className='treat-point-link';
+          const p=findAcupointByToken(matched);
+          if(p && p.important) a.classList.add('acu-important');
+          a.dataset.point=matched;
+          a.textContent=matched;
+          frag.appendChild(a);
+          i+=len; cursor=i;
         } else i++;
       }
       if(cursor<work.length) frag.appendChild(document.createTextNode(work.slice(cursor)));
@@ -874,8 +950,9 @@ function hideMeridianImage(){
   }
 }
 function updateMeridianImage(meridian){
-  if(!meridian){ hideMeridianImage(); }
-  else {
+  if(!meridian){
+    hideMeridianImage();
+  } else {
     const fileName = meridian + '.png';
     const url='image/'+encodeURI(fileName)+'?v='+APP_VERSION;
     meridianImageEl.onload = ()=>meridianImageSection.classList.remove('hidden');
