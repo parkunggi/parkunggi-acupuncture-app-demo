@@ -7,8 +7,7 @@
  *  - “Identifier 'name' has already been declared” によるパースエラー修正
  *  - その他ロジック (履歴/表示) は IMGFIX11 を踏襲
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX12';
-
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX13';
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
 
