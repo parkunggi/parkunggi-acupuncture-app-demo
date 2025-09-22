@@ -1,13 +1,13 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX17
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14
  *
- * IMGFIX17:
- *  - スマホ幅 (<768px) のみ #inline-acupoint-result を固定表示 (スクロール追随)
- *  - iPad (>=768px) / PC は従来通り非固定
- *  - 最小差分: mobile-fixed クラス付与/除去ロジック追加
+ * IMGFIX14:
+ *  - 経絡イメージセクションを治療方針セクション直下・同幅に配置しタイトル除去
+ *  - parseTreatmentPoints で記号単独(※・など)トークンを除外し「※」がリンク化される問題修正
+ *  - 他ロジックは IMGFIX13 相当
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX17';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -151,7 +151,6 @@ function applyState(state){
       case 'home':
         inputEl.value='';
         inlineAcupointResult.classList.add('hidden');
-        inlineAcupointResult.classList.remove('mobile-fixed'); // 保険
         hideMeridianImage();
         clinicalResultEl.classList.add('hidden');
         categorySelect.value='';
@@ -185,7 +184,6 @@ function applyState(state){
 
     if(showPointFlag){
       inlineAcupointResult.classList.remove('hidden');
-      updateMobileFix();
       if((state.type!=='point' && state.type!=='unknownPoint')
          && !meridianImageEl.src
          && resultMeridianEl.textContent
@@ -194,7 +192,6 @@ function applyState(state){
       }
     } else {
       inlineAcupointResult.classList.add('hidden');
-      inlineAcupointResult.classList.remove('mobile-fixed');
       hideMeridianImage();
     }
 
@@ -277,7 +274,7 @@ function renderPointHistoryMenu(){
       clone.showPoint = true;
       applyState(clone);
     });
-    patternHistoryMenuList.appendChild(li);
+    pointHistoryMenuList.appendChild(li);
   });
 }
 
@@ -408,7 +405,7 @@ function parseAcuCSV(raw){
   return results;
 }
 
-/* Treatment token utilities */
+/* Treatment token utilities (修正: 記号単独トークン除外) */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
@@ -426,7 +423,7 @@ function parseTreatmentPoints(raw){
     .filter(t=>t.length)
     .map(t=>t.replace(/[。.,、，;；/]+$/,''))
     .filter(Boolean)
-    .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));
+    .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));  // ここで記号のみは除外
 }
 function normalizeAcuLookupName(name){
   return removeAllUnicodeSpaces(name||'').trim();
@@ -622,7 +619,7 @@ function parseClinicalCSV(raw){
       const pRow=table[i];
       const patternNames=[];
       for(let c=1;c<pRow.length;c++){
-        const name=trimOuter(c=pRow[c]);
+        const name=trimOuter(pRow[c]);
         if(name){
           patternNames.push(name);
           if(!data.cats[category].patterns[name]){
@@ -880,15 +877,6 @@ function updateMeridianImage(meridian){
   }
 }
 
-/* Mobile fix helper (<768px) */
-function updateMobileFix(){
-  if(window.innerWidth < 768 && !inlineAcupointResult.classList.contains('hidden')){
-    inlineAcupointResult.classList.add('mobile-fixed');
-  } else {
-    inlineAcupointResult.classList.remove('mobile-fixed');
-  }
-}
-
 /* Detail display */
 function showPointDetail(p, suppressHistory=false){
   let regionHTML=p.region||'';
@@ -907,7 +895,6 @@ function showPointDetail(p, suppressHistory=false){
 
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
-  updateMobileFix();
   updateMeridianImage(p.meridian||'');
 
   if(!suppressHistory && !IS_APPLYING_HISTORY){
@@ -936,7 +923,6 @@ function showUnknownPoint(name, suppressHistory=false){
   if(resultMuscleEl) resultMuscleEl.textContent='（筋肉未登録）';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   inlineAcupointResult.classList.remove('hidden');
-  updateMobileFix();
   hideMeridianImage();
   if(!suppressHistory && !IS_APPLYING_HISTORY){
     pushState({type:'unknownPoint',name});
@@ -1035,7 +1021,6 @@ function goHome(suppressHistory=false){
   inputEl.value='';
   clearSuggestions();
   inlineAcupointResult.classList.add('hidden');
-  inlineAcupointResult.classList.remove('mobile-fixed');
   hideMeridianImage();
   categorySelect.value='';
   categorySelect.dispatchEvent(new Event('change'));
@@ -1162,10 +1147,7 @@ function init(){
     clinicalStatusEl.textContent='臨床CSV: JSエラー';
   }
 }
-window.addEventListener('resize', ()=>{
-  equalizeTopCards();
-  updateMobileFix();
-});
+window.addEventListener('resize', equalizeTopCards);
 init();
 
 /* [[ ]] fallback */
