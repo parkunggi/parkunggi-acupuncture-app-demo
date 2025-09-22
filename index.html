@@ -210,15 +210,36 @@
   }
 </style>
 
-<!-- 追加: sticky 用オーバーライド -->
-<style id="inline-acu-sticky">
-  @media (min-width:861px){
-    #inline-acupoint-result.sticky-active{
-      position:sticky;
-      top:66px;
-      max-height:calc(100vh - 80px);
+<!-- スマホ専用(幅<768px) 固定化: iPad(>=768px) には適用しない -->
+<style id="mobile-fixed-inline-acu">
+  @media (max-width:767px){
+    #inline-acupoint-result.mobile-fixed {
+      position:fixed;
+      top:60px; /* ヘッダ直下 */
+      left:0;
+      right:0;
+      z-index:950;
+      background:var(--box-bg);
+      border-top:1px solid var(--box-border);
+      border-bottom:1px solid var(--box-border);
+      max-height:calc(100vh - 70px);
       overflow:auto;
+      box-shadow:0 4px 12px rgba(0,0,0,.15);
+      /* スクロールバー簡易カスタム（任意） */
       scrollbar-width:thin;
+      scrollbar-color:#0d6efd #e2e8f0;
+    }
+    #inline-acupoint-result.mobile-fixed::-webkit-scrollbar{
+      width:8px;
+    }
+    #inline-acupoint-result.mobile-fixed::-webkit-scrollbar-track{
+      background:#e2e8f0;
+    }
+    #inline-acupoint-result.mobile-fixed::-webkit-scrollbar-thumb{
+      background:#0d6efd; border-radius:4px;
+    }
+    #inline-acupoint-result.mobile-fixed::-webkit-scrollbar-thumb:hover{
+      background:#084c9d;
     }
   }
 </style>
@@ -317,6 +338,6 @@
 
 <script src="readings.js?v=20250922-navlink"></script>
 <script src="muscle-map.js?v=20250922-navlink"></script>
-<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX15"></script>
+<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX17"></script>
 </body>
 </html>
