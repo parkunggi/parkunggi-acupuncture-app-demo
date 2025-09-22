@@ -1,14 +1,15 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX8
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX9
  *
- * IMGFIX8:
- *  - pushStateで前の履歴状態(prevState)を参照し、複合表示を確実に継承
- *    (pattern遷移時に直前point表示を、point/unknown遷移時に直前pattern表示を保持)
- *  - showPoint/showPattern が forward/back で欠落して片方が消える問題を解消
- *  - applyStateロジックはIMGFIX7のまま（フラグ再現方式）
+ * IMGFIX9:
+ *  - 統合履歴メニューを廃止し、治療方針専用(Pattern) / 経穴専用(Acupoint) の
+ *    2つの独立履歴メニューを追加 (patternHistory / pointHistory)
+ *  - pushState で各専用履歴を最大300件保持
+ *  - back/forward は従来の unified historyStack を利用 (仕様維持)
+ *  - 他の処理は IMGFIX8 のまま / 最小差分
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX8';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX9';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -63,13 +64,24 @@ const homeBtn = document.getElementById('home-btn');
 const backBtn = document.getElementById('back-btn');
 const forwardBtn = document.getElementById('forward-btn');
 
-const historyBtn = document.getElementById('history-btn');
-const historyMenu = document.getElementById('history-menu');
-const historyMenuList = document.getElementById('history-menu-list');
+/* 新しい個別履歴ボタン/メニュー */
+const patternHistoryBtn = document.getElementById('pattern-history-btn');
+const patternHistoryMenu = document.getElementById('pattern-history-menu');
+const patternHistoryMenuList = document.getElementById('pattern-history-menu-list');
 
+const pointHistoryBtn = document.getElementById('point-history-btn');
+const pointHistoryMenu = document.getElementById('point-history-menu');
+const pointHistoryMenuList = document.getElementById('point-history-menu-list');
+
+/* ================= Unified History (既存) ================= */
 let historyStack = [];
 let historyIndex = -1;
 let IS_APPLYING_HISTORY = false;
+
+/* 専用履歴: pattern / point */
+let patternHistory = [];  // {ref:state, idx:Number, ts:Number}
+let pointHistory   = [];  // {ref:state, idx:Number, ts:Number}
+const HISTORY_LIMIT = 300;
 
 function isShown(el){ return el && !el.classList.contains('hidden'); }
 
@@ -84,20 +96,20 @@ function statesEqual(a,b){
 function updateNavButtons(){
   backBtn.disabled = (historyIndex <= 0);
   forwardBtn.disabled = (historyIndex < 0 || historyIndex >= historyStack.length - 1);
-  if(!historyMenu.classList.contains('hidden')) renderHistoryDropdownMenu();
+  // 開いているメニューのみ再描画
+  if(!patternHistoryMenu.classList.contains('hidden')) renderPatternHistoryMenu();
+  if(!pointHistoryMenu.classList.contains('hidden')) renderPointHistoryMenu();
 }
 
-/* 改良 pushState: prevState 継承ロジック追加 */
+/* pushState 強化 (IMGFIX8 + 専用履歴追加) */
 function pushState(state, replace=false){
   if(IS_APPLYING_HISTORY) return;
 
   const prevState = historyStack[historyIndex] || null;
 
-  // DOM 現在可視状態を初期値
   state.showPoint   = state.showPoint   !== undefined ? state.showPoint   : isShown(inlineAcupointResult);
   state.showPattern = state.showPattern !== undefined ? state.showPattern : isShown(clinicalResultEl);
 
-  // 種別別の最低限設定
   if(state.type==='home'){
     state.showPoint=false;
     state.showPattern=false;
@@ -107,34 +119,40 @@ function pushState(state, replace=false){
     state.showPattern=true;
   }
 
-  // 直前状態の複合表示を維持する継承ロジック
   if(prevState){
-    // pattern へ遷移する際、直前が point/unknown/point付きpattern で showPoint=true なら継承
     if(state.type==='pattern' && prevState.showPoint){
       state.showPoint = true;
     }
-    // point/unknown へ遷移する際、直前が pattern で showPattern=true なら継承
     if((state.type==='point' || state.type==='unknownPoint') && prevState.showPattern){
       state.showPattern = true;
     }
   }
 
-  // 同一状態なら表示フラグだけ更新
   if(historyIndex>=0 && statesEqual(historyStack[historyIndex], state)){
     historyStack[historyIndex].showPoint   = state.showPoint;
     historyStack[historyIndex].showPattern = state.showPattern;
-    return;
-  }
-
-  if(replace){
-    if(historyIndex>=0) historyStack[historyIndex]=state;
-    else { historyStack.push(state); historyIndex=0; }
+    // state 更新でも個別履歴は新規追加せず終わり
   } else {
-    if(historyIndex < historyStack.length -1){
-      historyStack = historyStack.slice(0, historyIndex+1);
+    if(replace){
+      if(historyIndex>=0) historyStack[historyIndex]=state;
+      else { historyStack.push(state); historyIndex=0; }
+    } else {
+      if(historyIndex < historyStack.length -1){
+        historyStack = historyStack.slice(0, historyIndex+1);
+      }
+      state.ts = Date.now();
+      historyStack.push(state);
+      historyIndex = historyStack.length -1;
     }
-    historyStack.push(state);
-    historyIndex = historyStack.length -1;
+
+    // 個別履歴登録
+    if(state.type==='pattern'){
+      patternHistory.push({ref:state, idx:historyIndex, ts:state.ts||Date.now()});
+      if(patternHistory.length>HISTORY_LIMIT) patternHistory.shift();
+    } else if(state.type==='point' || state.type==='unknownPoint'){
+      pointHistory.push({ref:state, idx:historyIndex, ts:state.ts||Date.now()});
+      if(pointHistory.length>HISTORY_LIMIT) pointHistory.shift();
+    }
   }
   updateNavButtons();
 }
@@ -181,13 +199,12 @@ function applyState(state){
         break;
     }
 
-    // 最終表示制御
     if(showPointFlag){
       inlineAcupointResult.classList.remove('hidden');
       if((state.type!=='point' && state.type!=='unknownPoint')
-         && !meridianImageEl.src
-         && resultMeridianEl.textContent
-         && !/未登録/.test(resultMeridianEl.textContent)){
+        && !meridianImageEl.src
+        && resultMeridianEl.textContent
+        && !/未登録/.test(resultMeridianEl.textContent)){
         updateMeridianImage(resultMeridianEl.textContent.trim());
       }
     } else {
@@ -220,7 +237,116 @@ function goForward(){
   }
 }
 
-/* ===== Utility (以下 IMGFIX7 と同じ) ===== */
+/* ================= 個別履歴メニュー描画 ================= */
+function formatTime(ts){
+  const d=new Date(ts||Date.now());
+  const pad=n=>('0'+n).slice(-2);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function renderPatternHistoryMenu(){
+  patternHistoryMenuList.innerHTML='';
+  // 最新を上 (配列末尾が最新なので逆順)
+  const arr=[...patternHistory].reverse();
+  if(!arr.length){
+    const li=document.createElement('li');
+    li.textContent='履歴なし';
+    patternHistoryMenuList.appendChild(li);
+    return;
+  }
+  const current = historyStack[historyIndex];
+  arr.forEach(entry=>{
+    const st=entry.ref;
+    const li=document.createElement('li');
+    if(st===current) li.classList.add('active');
+    const label = `病証: ${st.cat}/${transformPatternDisplay(st.pattern)}`;
+    li.innerHTML=`
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="hist-time">${formatTime(entry.ts)}</span>
+      </div>
+      <div class="hist-label">${escapeHTML(label)}</div>
+    `;
+    li.addEventListener('click', ()=>{
+      patternHistoryMenu.classList.add('hidden');
+      historyIndex = entry.idx;
+      applyState(st);
+    });
+    patternHistoryMenuList.appendChild(li);
+  });
+}
+
+function renderPointHistoryMenu(){
+  pointHistoryMenuList.innerHTML='';
+  const arr=[...pointHistory].reverse();
+  if(!arr.length){
+    const li=document.createElement('li');
+    li.textContent='履歴なし';
+    pointHistoryMenuList.appendChild(li);
+    return;
+  }
+  const current = historyStack[historyIndex];
+  arr.forEach(entry=>{
+    const st=entry.ref;
+    const li=document.createElement('li');
+    if(st===current) li.classList.add('active');
+    const label = (st.type==='unknownPoint')
+      ? `未登録: ${st.name}`
+      : `経穴: ${st.name}`;
+    li.innerHTML=`
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="hist-time">${formatTime(entry.ts)}</span>
+      </div>
+      <div class="hist-label">${escapeHTML(label)}</div>
+    `;
+    li.addEventListener('click', ()=>{
+      pointHistoryMenu.classList.add('hidden');
+      historyIndex = entry.idx;
+      applyState(st);
+    });
+    pointHistoryMenuList.appendChild(li);
+  });
+}
+
+/* メニュー開閉イベント */
+if(patternHistoryBtn){
+  patternHistoryBtn.addEventListener('click', ()=>{
+    // もう一方閉じる
+    pointHistoryMenu.classList.add('hidden');
+    if(patternHistoryMenu.classList.contains('hidden')){
+      renderPatternHistoryMenu();
+      patternHistoryMenu.classList.remove('hidden');
+    } else patternHistoryMenu.classList.add('hidden');
+  });
+}
+if(pointHistoryBtn){
+  pointHistoryBtn.addEventListener('click', ()=>{
+    patternHistoryMenu.classList.add('hidden');
+    if(pointHistoryMenu.classList.contains('hidden')){
+      renderPointHistoryMenu();
+      pointHistoryMenu.classList.remove('hidden');
+    } else pointHistoryMenu.classList.add('hidden');
+  });
+}
+/* メニュー外クリック/ESC閉じ */
+document.addEventListener('click', e=>{
+  if(!patternHistoryMenu.classList.contains('hidden')){
+    if(!e.target.closest('#pattern-history-btn-wrapper')){
+      patternHistoryMenu.classList.add('hidden');
+    }
+  }
+  if(!pointHistoryMenu.classList.contains('hidden')){
+    if(!e.target.closest('#point-history-btn-wrapper')){
+      pointHistoryMenu.classList.add('hidden');
+    }
+  }
+});
+window.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    patternHistoryMenu.classList.add('hidden');
+    pointHistoryMenu.classList.add('hidden');
+  }
+});
+
+/* ================= Utility 関数群 (既存) ================= */
 function normalizeNFC(s){ return s? s.normalize('NFC'):''; }
 function removeAllUnicodeSpaces(str){
   return normalizeNFC(str||'')
@@ -264,7 +390,7 @@ function transformPatternDisplay(original){
 }
 function getDisplayPatternName(n){ return transformPatternDisplay(n); }
 
-/* ===== 経穴CSV ===== */
+/* ================= 経穴CSVパーサ ================= */
 function parseAcuCSV(raw){
   if(!raw) return [];
   const text = raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
@@ -311,7 +437,7 @@ function parseAcuCSV(raw){
   return results;
 }
 
-/* ===== Token / Lookup ===== */
+/* ================= Token / Lookup ================= */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
@@ -342,6 +468,8 @@ function buildNameLookup(){
   ACUPOINT_NAME_LIST = ACUPOINTS.map(p=>p.name).sort((a,b)=> b.length - a.length);
   ACUPOINT_NAME_SET = new Set(ACUPOINT_NAME_LIST);
 }
+
+/* ================= matchToken ================= */
 function matchTokenWithSpaces(raw,pos,token){
   let i=pos,k=0,len=raw.length;
   while(k<token.length){
@@ -352,6 +480,8 @@ function matchTokenWithSpaces(raw,pos,token){
   }
   return i - pos;
 }
+
+/* ================= linkifyParenthesisGroup / buildPointsHTML ================= */
 function linkifyParenthesisGroup(group){
   if(group.length<2) return escapeHTML(group);
   const open=group[0], close=group[group.length-1];
@@ -411,7 +541,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* ===== Clinical CSV ===== */
+/* ================= Clinical CSV パース関連 ================= */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -583,7 +713,7 @@ function parseClinicalCSV(raw){
   return data;
 }
 
-/* ===== 逆引き ===== */
+/* ================= 逆引き ================= */
 function rebuildAcuPointPatternIndex(){
   ACUPOINT_PATTERN_INDEX={};
   CLINICAL_DATA.order.forEach(cat=>{
@@ -611,7 +741,7 @@ function rebuildAcuPointPatternIndex(){
   });
 }
 
-/* ===== 表示補助 ===== */
+/* ================= 表示補助 ================= */
 function equalizeTopCards(){
   if(window.innerWidth<860){
     searchCard.style.height='';
@@ -625,7 +755,7 @@ function equalizeTopCards(){
   symptomCard.style.height=maxH+'px';
 }
 
-/* ===== Suggestion ===== */
+/* ================= Suggestion ================= */
 function filterPoints(qInput){
   const q=removeAllUnicodeSpaces(qInput);
   if(q.length<MIN_QUERY_LENGTH) return [];
@@ -718,7 +848,7 @@ function handleSuggestionKeyboard(e){
   } else if(e.key==='Escape'){ clearSuggestions(); }
 }
 
-/* ===== 部位内リンク化 ===== */
+/* ================= 部位内経穴リンク化 ================= */
 function linkifyRegionAcupoints(html){
   if(!html || !ACUPOINT_NAME_LIST.length) return html;
   const wrapper=document.createElement('div');
@@ -759,7 +889,7 @@ function linkifyRegionAcupoints(html){
   return wrapper.innerHTML;
 }
 
-/* ===== 経絡イメージ ===== */
+/* ================= 経絡イメージ ================= */
 function hideMeridianImage(){
   if(meridianImageSection){
     meridianImageSection.classList.add('hidden');
@@ -782,7 +912,7 @@ function updateMeridianImage(meridian){
   }
 }
 
-/* ===== 詳細表示 ===== */
+/* ================= 詳細表示 ================= */
 function showPointDetail(p, suppressHistory=false){
   let regionHTML=p.region||'';
   if(regionHTML.includes('[[')){
@@ -840,7 +970,7 @@ function selectPoint(p){
   showPointDetail(p);
 }
 
-/* ===== 臨床 UI ===== */
+/* ================= 臨床 UI ================= */
 categorySelect.addEventListener('change', ()=>{
   const cat=categorySelect.value;
   patternSelect.innerHTML='<option value="">--</option>';
@@ -899,7 +1029,7 @@ patternSelect.addEventListener('change', ()=>{
   }
 });
 
-/* ===== 病証リンク ===== */
+/* ==== 病証リンク ==== */
 document.addEventListener('click', e=>{
   const a=e.target.closest('.acu-pattern-link');
   if(!a) return;
@@ -914,7 +1044,7 @@ document.addEventListener('click', e=>{
   patternSelect.dispatchEvent(new Event('change'));
 });
 
-/* ===== 治療点リンク ===== */
+/* ==== 治療点リンク ==== */
 document.addEventListener('click', e=>{
   const a=e.target.closest('.treat-point-link');
   if(!a) return;
@@ -924,7 +1054,7 @@ document.addEventListener('click', e=>{
   if(p) showPointDetail(p); else showUnknownPoint(nm);
 });
 
-/* ===== ホーム ===== */
+/* ================= ホーム ================= */
 function goHome(suppressHistory=false){
   inputEl.value='';
   clearSuggestions();
@@ -951,7 +1081,7 @@ function goHome(suppressHistory=false){
 }
 homeBtn.addEventListener('click', ()=>goHome());
 
-/* ===== ナビ ===== */
+/* ================= ナビ ================= */
 backBtn.addEventListener('click', goBack);
 forwardBtn.addEventListener('click', goForward);
 document.addEventListener('keydown', e=>{
@@ -961,7 +1091,7 @@ document.addEventListener('keydown', e=>{
   }
 });
 
-/* ===== 検索 ===== */
+/* ================= 検索 ================= */
 function runSearch(){
   if(!DATA_READY) return;
   const q=removeAllUnicodeSpaces(inputEl.value);
@@ -996,7 +1126,7 @@ document.addEventListener('click', e=>{
   }
 });
 
-/* ===== ロード ===== */
+/* ================= ロード ================= */
 async function loadAcuCSV(){
   statusEl.textContent='経穴CSV: 読込中';
   try{
@@ -1041,7 +1171,7 @@ async function loadClinicalCSV(){
   }
 }
 
-/* ===== 初期化 ===== */
+/* ================= 初期化 ================= */
 function init(){
   try{
     loadAcuCSV();
@@ -1068,7 +1198,7 @@ function init(){
 window.addEventListener('resize', equalizeTopCards);
 init();
 
-/* ===== [[ ]] Fallback ===== */
+/* ================= [[ ]] Fallback ================= */
 (function installRegionFallback(){
   document.addEventListener('DOMContentLoaded', ()=>{
     const container=document.getElementById('inline-acupoint-result');
@@ -1085,69 +1215,3 @@ init();
     patch();
   });
 })();
-
-/* ===== 履歴ドロップダウン ===== */
-function stateToLabel(st){
-  switch(st.type){
-    case 'home': return 'Home';
-    case 'point': return `経穴: ${st.name}`;
-    case 'unknownPoint': return `未登録: ${st.name}`;
-    case 'pattern': return `病証: ${st.cat}/${getDisplayPatternName(st.pattern)}`;
-    default: return st.type;
-  }
-}
-function formatTime(ts){
-  const d=new Date(ts);
-  const pad=n=>('0'+n).slice(-2);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-function renderHistoryDropdownMenu(){
-  if(!historyMenuList) return;
-  historyMenuList.innerHTML='';
-  const cur = historyStack[historyIndex] || null;
-  const arr = historyStack.slice().reverse();
-  arr.forEach(st=>{
-    const li=document.createElement('li');
-    if(cur && statesEqual(cur, st)) li.classList.add('active');
-    const timePart = st.ts? formatTime(st.ts):'';
-    li.innerHTML=`
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span class="hist-type">${escapeHTML(st.type)}</span>
-        <span class="hist-time">${escapeHTML(timePart)}</span>
-      </div>
-      <div class="hist-label">${escapeHTML(stateToLabel(st))}</div>
-    `;
-    li.addEventListener('click', ()=>{
-      historyMenu.classList.add('hidden');
-      const targetIndex = historyStack.indexOf(st);
-      if(targetIndex!==-1){
-        historyIndex = targetIndex;
-        applyState(st);
-      }
-    });
-    historyMenuList.appendChild(li);
-  });
-  if(!arr.length){
-    const li=document.createElement('li');
-    li.textContent='履歴なし';
-    historyMenuList.appendChild(li);
-  }
-}
-if(historyBtn){
-  historyBtn.addEventListener('click', ()=>{
-    if(historyMenu.classList.contains('hidden')){
-      renderHistoryDropdownMenu();
-      historyMenu.classList.remove('hidden');
-    } else historyMenu.classList.add('hidden');
-  });
-  document.addEventListener('click', e=>{
-    if(historyMenu.classList.contains('hidden')) return;
-    if(e.target===historyBtn || historyBtn.contains(e.target) || historyMenu.contains(e.target)) return;
-    historyMenu.classList.add('hidden');
-  });
-  window.addEventListener('keydown', e=>{
-    if(e.key==='Escape' && !historyMenu.classList.contains('hidden')){
-      historyMenu.classList.add('hidden');
-    }
-  });
-}
