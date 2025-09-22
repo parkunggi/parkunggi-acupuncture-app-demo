@@ -62,8 +62,17 @@
   main { padding:12px 16px 48px; }
 
   #main-screen { display:grid; grid-template-columns:minmax(0,1fr) var(--right-col-width); gap:var(--gap); align-items:start; }
-  .left-inner { display:grid; gap:var(--gap); grid-template-columns:1fr 1fr; grid-template-areas:"search symptoms" "treatment treatment"; align-items:start; }
-  .search-container{grid-area:search;} .selection-container{grid-area:symptoms;} .clinical-result{grid-area:treatment;}
+  /* 変更: meridian 行を追加 */
+  .left-inner { display:grid; gap:var(--gap); grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "search symptoms"
+      "treatment treatment"
+      "meridian meridian";
+    align-items:start;
+  }
+  .search-container{grid-area:search;} .selection-container{grid-area:symptoms;}
+  .clinical-result{grid-area:treatment;}
+  .meridian-image-section{grid-area:meridian;}
 
   .search-container, .selection-container, .clinical-result, .result-layout {
     background:var(--box-bg); border:1px solid var(--box-border); border-radius:var(--radius); padding:12px 14px 14px;
@@ -89,7 +98,6 @@
   }
 
   #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
-  /* 修正: 誤 var(--重要-red) -> var(--important-red) */
   #result-name.is-important { color:var(--important-red); }
 
   #acupoint-search-input {
@@ -115,7 +123,6 @@
   }
   #acupoint-suggestion-list li:not(:last-child){ border-bottom:1px solid #eef1f4; }
   #acupoint-suggestion-list li .sug-name { font-weight:600; color:#222; white-space:nowrap; }
-  /* 修正: 誤 var(--重要-red) -> var(--important-red) */
   #acupoint-suggestion-list li .sug-name.important { color:var(--important-red); }
   #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; font-weight:400; }
   #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -164,32 +171,23 @@
   .treat-comment { margin:0 0 4px; font-size:.63rem; color:#555; }
   .hidden { display:none !important; }
 
+  /* 経絡イメージセクション調整 */
   .meridian-image-section {
-    margin-top:12px;
     background:var(--box-bg);
     border:1px solid var(--box-border);
     border-radius:var(--radius);
-    padding:12px 14px 14px;
-  }
-  .meridian-image-section h2 {
-    margin:0 0 8px;
-    font-size:.95rem;
-    font-weight:600;
+    padding:0; /* 画像を全面に */
+    overflow:hidden;
   }
   .meridian-image-wrapper {
     width:100%;
-    background:#f2f4f6;
-    border:1px dashed #c8d0d8;
-    border-radius:6px;
-    text-align:center;
-    padding:6px;
+    height:100%;
+    background:#fff;
   }
   .meridian-image-wrapper img {
     width:100%;
     height:auto;
-    max-width:100%;
-    object-fit:contain;
-    display:inline-block;
+    display:block;
   }
 
   #status-float {
@@ -202,7 +200,13 @@
 
   @media (max-width:860px) {
     #main-screen { grid-template-columns:1fr; }
-    .left-inner { grid-template-columns:1fr; grid-template-areas:"search" "symptoms" "treatment"; }
+    .left-inner { grid-template-columns:1fr;
+      grid-template-areas:
+        "search"
+        "symptoms"
+        "treatment"
+        "meridian";
+    }
     #inline-acupoint-result { position:static; max-height:none; order:4; margin-top:var(--gap); }
     #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
   }
@@ -269,7 +273,7 @@
         <h2>症状・病証</h2>
         <div style="margin-bottom:6px;">
           <label for="clinical-category-select" style="display:block;font-size:.7rem;margin:0 0 3px;">カテゴリ</label>
-          <select id="clinical-category-select"><option value="">--</option></select>
+            <select id="clinical-category-select"><option value="">--</option></select>
         </div>
         <div>
           <label for="clinical-pattern-select" style="display:block;font-size:.7rem;margin:0 0 3px;">病証</label>
@@ -280,6 +284,13 @@
       <div id="clinical-treatment-result" class="clinical-result hidden" aria-live="polite">
         <h2 id="clinical-selected-title" style="margin-top:0;">治療方針(治法)：<span class="pattern-name-highlight"></span></h2>
         <div id="clinical-treatment-groups"></div>
+      </div>
+
+      <!-- 経絡イメージを治療方針の直下・同幅で表示（タイトル削除） -->
+      <div id="meridian-image-section" class="meridian-image-section hidden" aria-live="polite">
+        <div class="meridian-image-wrapper">
+          <img id="meridian-image" alt="" decoding="async">
+        </div>
       </div>
     </div>
 
@@ -296,13 +307,6 @@
     </div>
   </section>
 
-  <div id="meridian-image-section" class="meridian-image-section hidden" aria-live="polite">
-    <h2>経絡イメージ</h2>
-    <div class="meridian-image-wrapper">
-      <img id="meridian-image" alt="" decoding="async">
-    </div>
-  </div>
-
   <div id="status-float">
     <span id="data-load-status">CSV 読み込み中...</span>
     <span id="clinical-load-status">臨床CSV 読み込み中...</span>
@@ -311,6 +315,6 @@
 
 <script src="readings.js?v=20250922-navlink"></script>
 <script src="muscle-map.js?v=20250922-navlink"></script>
-<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX13"></script>
+<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14"></script>
 </body>
 </html>
