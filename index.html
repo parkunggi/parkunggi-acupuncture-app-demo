@@ -41,24 +41,23 @@
   .nav-btn[disabled] { opacity:.4; cursor:not-allowed; }
   .nav-btn svg { width:18px; height:18px; fill:currentColor; }
 
-  #history-btn-wrapper { position:relative; }
-  #history-menu {
+  /* 個別履歴メニュー共通 */
+  .history-menu {
     position:absolute; top:42px; right:0;
     background:#fff; color:#222; border:1px solid #c8d0d8;
     border-radius:8px; width:260px; max-height:320px; overflow:auto;
     box-shadow:0 4px 14px rgba(0,0,0,.18); padding:6px 0; font-size:12px; z-index:1200;
   }
-  #history-menu.hidden { display:none; }
-  #history-menu ul { list-style:none; margin:0; padding:0; }
-  #history-menu li {
+  .history-menu.hidden { display:none; }
+  .history-menu ul { list-style:none; margin:0; padding:0; }
+  .history-menu li {
     padding:6px 10px 5px; line-height:1.25; cursor:pointer; border-bottom:1px solid #eef2f5;
     display:flex; flex-direction:column; gap:2px;
   }
-  #history-menu li:last-child { border-bottom:none; }
-  #history-menu li:hover { background:#eef5ff; }
-  #history-menu li.active { background:#d9ecff; font-weight:600; }
+  .history-menu li:last-child { border-bottom:none; }
+  .history-menu li:hover { background:#eef5ff; }
+  .history-menu li.active { background:#d9ecff; font-weight:600; }
   .hist-label { font-size:11px; }
-  .hist-type { display:none !important; }
   .hist-time { font-size:10px; color:#666; margin-left:auto; }
 
   main { padding:12px 16px 48px; }
@@ -230,12 +229,24 @@
     </button>
   </div>
   <h1>パクの経穴検索エンジン ver_240921</h1>
-  <div id="history-btn-wrapper">
-    <button id="history-btn" class="nav-btn" type="button" aria-label="履歴" title="履歴">
-      <svg viewBox="0 0 24 24"><path d="M12 6a1 1 0 0 1 1 1v4.17l3.12 1.8a1 1 0 0 1-1 1.74l-3.62-2.09A1 1 0 0 1 11 12V7a1 1 0 0 1 1-1Zm0-4a10 10 0 1 0 9.95 11.14 1 1 0 0 0-2-.28A8 8 0 1 1 12 4Z"/></svg>
+
+  <!-- 治療方針履歴ボタン -->
+  <div id="pattern-history-btn-wrapper" style="position:relative;">
+    <button id="pattern-history-btn" class="nav-btn" type="button" aria-label="治療方針履歴" title="治療方針 履歴 (Pattern)">
+      <svg viewBox="0 0 24 24"><text x="6" y="17" font-size="14" font-weight="700">P</text></svg>
     </button>
-    <div id="history-menu" class="hidden" role="listbox" aria-label="履歴メニュー">
-      <ul id="history-menu-list"></ul>
+    <div id="pattern-history-menu" class="history-menu hidden" role="listbox" aria-label="治療方針履歴メニュー">
+      <ul id="pattern-history-menu-list"></ul>
+    </div>
+  </div>
+
+  <!-- 経穴履歴ボタン -->
+  <div id="point-history-btn-wrapper" style="position:relative;">
+    <button id="point-history-btn" class="nav-btn" type="button" aria-label="経穴履歴" title="経穴 履歴 (Acupoint)">
+      <svg viewBox="0 0 24 24"><text x="6" y="17" font-size="14" font-weight="700">A</text></svg>
+    </button>
+    <div id="point-history-menu" class="history-menu hidden" role="listbox" aria-label="経穴履歴メニュー">
+      <ul id="point-history-menu-list"></ul>
     </div>
   </div>
 </header>
@@ -301,6 +312,6 @@
 
 <script src="readings.js?v=20250922-navlink"></script>
 <script src="muscle-map.js?v=20250922-navlink"></script>
-<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX8"></script>
+<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX9"></script>
 </body>
 </html>
