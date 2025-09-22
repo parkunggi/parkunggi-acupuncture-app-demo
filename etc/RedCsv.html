@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>XLSX 赤字→[[...]] 変換 (部位列) 改良版</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body { font-family: system-ui, sans-serif; margin:16px; line-height:1.5; }
+h1 { font-size:1.05rem; margin:0 0 12px; }
+label { font-weight:600; display:block; margin:14px 0 4px; }
+input,select { font-size:.9rem; }
+textarea { width:100%; min-height:220px; font-family: ui-monospace,monospace; font-size:12px; }
+button { padding:8px 14px; border:1px solid #0d6efd; background:#0d6efd; color:#fff; border-radius:6px; cursor:pointer; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+small { color:#555; }
+pre { background:#f4f6f9; padding:8px; overflow:auto; font-size:11px; border-radius:6px; }
+fieldset { border:1px solid #d0d7de; border-radius:8px; padding:12px 14px 14px; margin:14px 0; }
+legend { padding:0 6px; font-size:.8rem; font-weight:600; color:#333; }
+#status { white-space:pre-wrap; font-size:.8rem; margin-top:8px; }
+.warning { color:#b03000; font-weight:600; }
+.success { color:#096a09; font-weight:600; }
+.flex { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+.inline { display:inline-block; margin-right:8px; }
+.badge { background:#eef2f7; color:#333; font-size:.65rem; padding:2px 6px; border-radius:999px; margin-right:4px; }
+#sheetSummary pre { max-height:220px; }
+hr { border:none; border-top:1px solid #e1e4e8; margin:24px 0; }
+</style>
+</head>
+<body>
+<h1>経穴・経絡.xlsx「部位」列 赤字 → [[...]] マーク変換ツール (改良版)</h1>
+
+<ol style="font-size:.85rem; padding-left:1.1rem; margin:8px 0 18px;">
+  <li>XLSX を選択</li>
+  <li>シート選択 & ヘッダー自動検出確認 (必要に応じ手動指定)</li>
+  <li>変換開始 → CSV ダウンロード（<code>経穴・経絡.csv</code> と置換）</li>
+</ol>
+
+<label for="file">XLSX ファイル:</label>
+<input id="file" type="file" accept=".xlsx">
+
+<fieldset>
+  <legend>シート & ヘッダー設定</legend>
+  <div class="flex">
+    <div>
+      <label for="sheetSelect">シート:</label>
+      <select id="sheetSelect" disabled></select>
+    </div>
+    <div>
+      <label for="headerName">部位ヘッダー名(表示で検索):</label>
+      <input id="headerName" type="text" value="部位" style="width:140px;">
+    </div>
+    <div>
+      <label for="headerRowOverride">ヘッダー行番号(任意):</label>
+      <input id="headerRowOverride" type="text" placeholder="例: 2" style="width:90px;">
+    </div>
+    <div>
+      <label for="columnOverride">部位列 (番号 or A,B,...):</label>
+      <input id="columnOverride" type="text" placeholder="例: C" style="width:90px;">
+    </div>
+    <div>
+      <button id="rescanBtn" disabled>再探索</button>
+    </div>
+  </div>
+  <small>自動探索は最初の30行を走査。見つからない場合は上書き指定してください。</small>
+</fieldset>
+
+<div id="sheetSummary"></div>
+
+<div style="margin:14px 0;">
+  <button id="startBtn" disabled>変換開始</button>
+</div>
+
+<div id="status"></div>
+
+<hr>
+
+<h2 style="font-size:1rem; margin:14px 0 6px;">CSV プレビュー (先頭部分)</h2>
+<textarea id="csvOutput" placeholder="変換結果が表示されます"></textarea>
+<div style="margin-top:8px;">
+  <button id="downloadBtn" disabled>CSV ダウンロード</button>
+</div>
+<small>ダウンロード後のファイル名を <code>経穴・経絡.csv</code> に変更してリポジトリへアップしてください。</small>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+/* ===== DOM ===== */
+const fileInput = document.getElementById('file');
+const sheetSelect = document.getElementById('sheetSelect');
+const headerNameInput = document.getElementById('headerName');
+const headerRowOverride = document.getElementById('headerRowOverride');
+const columnOverride = document.getElementById('columnOverride');
+const rescanBtn = document.getElementById('rescanBtn');
+const startBtn = document.getElementById('startBtn');
+const statusEl = document.getElementById('status');
+const csvOutput = document.getElementById('csvOutput');
+const downloadBtn = document.getElementById('downloadBtn');
+const sheetSummary = document.getElementById('sheetSummary');
+
+let arrayBuffer = null;
+let zip = null;
+let sheetFiles = []; // {name,path}
+let sharedStringsXML = null;
+let sharedMap = {};
+let currentSheetTable = [];
+let detectedHeader = null; // {rowIndex, colIndex}
+let lastCSV = '';
+
+/* ===== Helpers ===== */
+function log(msg, cls){
+  statusEl.innerHTML += (cls
+    ? `<div class="${cls}">${escapeHtml(msg)}</div>`
+    : `<div>${escapeHtml(msg)}</div>`);
+}
+function setStatus(msg, cls){
+  statusEl.innerHTML = cls
+    ? `<div class="${cls}">${escapeHtml(msg)}</div>`
+    : `<div>${escapeHtml(msg)}</div>`;
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function normalizeHeader(s){
+  return (s||'').replace(/[\s\u3000]/g,'').trim();
+}
+function columnLabelToIndex(lbl){ // A->1
+  let n=0;
+  lbl = lbl.toUpperCase().trim();
+  for(let i=0;i<lbl.length;i++){
+    const code = lbl.charCodeAt(i);
+    if(code<65 || code>90) return NaN;
+    n = n*26 + (code - 64);
+  }
+  return n;
+}
+function indexToColumnLabel(n){ // 1->A
+  let s='';
+  while(n>0){
+    const m=(n-1)%26;
+    s=String.fromCharCode(65+m)+s;
+    n = Math.floor((n-1)/26);
+  }
+  return s;
+}
+
+/* ===== File Load ===== */
+fileInput.addEventListener('change', async e=>{
+  resetAll();
+  const file = e.target.files[0];
+  if(!file){
+    return;
+  }
+  setStatus('ZIP 読み込み中: '+file.name);
+  try{
+    arrayBuffer = await file.arrayBuffer();
+    zip = await JSZip.loadAsync(arrayBuffer);
+
+    // sharedStrings
+    if(zip.file('xl/sharedStrings.xml')){
+      sharedStringsXML = await zip.file('xl/sharedStrings.xml').async('string');
+      sharedMap = parseSharedStrings(sharedStringsXML);
+    } else {
+      sharedStringsXML = null;
+      sharedMap = {};
+    }
+
+    // sheet ファイル列挙
+    sheetFiles = Object.keys(zip.files)
+      .filter(p=>/^xl\/worksheets\/sheet\d+\.xml$/.test(p))
+      .sort((a,b)=>{
+        const na=parseInt(a.match(/sheet(\d+)\.xml/)[1],10);
+        const nb=parseInt(b.match(/sheet(\d+)\.xml/)[1],10);
+        return na-nb;
+      })
+      .map(p=>({
+        path: p,
+        name: p.match(/(sheet\d+)\.xml/)[1]
+      }));
+
+    if(!sheetFiles.length){
+      throw new Error('ワークシート (xl/worksheets/sheetN.xml) が見つかりません。');
+    }
+
+    // シート選択構築
+    sheetSelect.innerHTML='';
+    sheetFiles.forEach(sf=>{
+      const opt=document.createElement('option');
+      opt.value=sf.path;
+      opt.textContent=sf.name;
+      sheetSelect.appendChild(opt);
+    });
+    sheetSelect.disabled=false;
+    rescanBtn.disabled=false;
+    startBtn.disabled=false;
+
+    setStatus('シート数: '+sheetFiles.length+' 読み込み完了。シートを選んでください。','success');
+
+    // 初期シート解析
+    await loadSelectedSheet();
+
+  }catch(err){
+    console.error(err);
+    setStatus('エラー: '+(err.message||err),'warning');
+  }
+});
+
+sheetSelect.addEventListener('change', async ()=>{
+  await loadSelectedSheet();
+});
+
+rescanBtn.addEventListener('click', async ()=>{
+  await detectHeaderAndShow();
+});
+
+startBtn.addEventListener('click', async ()=>{
+  if(!currentSheetTable.length){
+    setStatus('先にシートを読み込んでください。','warning'); return;
+  }
+  try{
+    setStatus('変換処理中...');
+    const hdrName = headerNameInput.value.trim();
+    const {rowIndex, colIndex} = resolveHeaderPosition(currentSheetTable, hdrName);
+    if(colIndex == null){
+      throw new Error('部位列が確定できません。列指定またはヘッダー名を調整してください。');
+    }
+    // 赤 run マーク適用
+    const transformedTable = applyRedMarkupToColumn(currentSheetTable, rowIndex, colIndex);
+    const csv = tableToCSV(transformedTable);
+    lastCSV = csv;
+    csvOutput.value = csv.slice(0, 200000);
+    setStatus(`変換完了: 行=${transformedTable.length} / 列=${transformedTable[0].length}  (プレビューは先頭のみ)`, 'success');
+    downloadBtn.disabled=false;
+  }catch(err){
+    console.error(err);
+    setStatus('エラー: '+(err.message||err),'warning');
+  }
+});
+
+downloadBtn.addEventListener('click', ()=>{
+  if(!lastCSV) return;
+  const blob = new Blob([lastCSV], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='経穴・経絡.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 1000);
+});
+
+/* ===== Sheet Load & Header Detect ===== */
+async function loadSelectedSheet(){
+  const path = sheetSelect.value;
+  if(!path){ return; }
+  setStatus('シート読み込み: '+path);
+  const sheetXML = await zip.file(path).async('string');
+  currentSheetTable = parseSheetXml(sheetXML, sharedMap);
+  await detectHeaderAndShow();
+}
+
+/* 検出 + サマリ表示 */
+async function detectHeaderAndShow(){
+  const hdrName = headerNameInput.value.trim();
+  detectedHeader = autoDetectHeader(currentSheetTable, hdrName);
+
+  // サマリ描画
+  const previewRows = currentSheetTable.slice(0, 15); // 先頭15行
+  let html = `<fieldset><legend>シートプレビュー</legend>`;
+  html += `<div style="font-size:.7rem; margin-bottom:6px;">先頭15行 (ヘッダー候補行強調)</div>`;
+  html += `<pre>`;
+  const colCount = previewRows.reduce((m,r)=>Math.max(m,r.length),0);
+  // build header row marking
+  let headerRowIndex = detectedHeader ? detectedHeader.rowIndex : null;
+  previewRows.forEach((row, rIdx)=>{
+    let line='';
+    for(let c=0;c<colCount;c++){
+      let v = row[c] || '';
+      v = v.replace(/\r?\n/g,'↵');
+      if(v.length>18) v = v.slice(0,16)+'…';
+      const cellTag = (headerRowIndex===rIdx) ? '[H]' : '   ';
+      line += cellTag + indexToColumnLabel(c+1).padEnd(4,' ') + ':' + v + ' | ';
+    }
+    html += escapeHtml(line)+'\n';
+  });
+  html += `</pre>`;
+  // 詳細検出結果
+  html += `<div style="font-size:.75rem;">`;
+  if(detectedHeader){
+    html += `<div>自動検出: 行 ${detectedHeader.rowIndex+1} / 列 ${indexToColumnLabel(detectedHeader.colIndex+1)} (${hdrName})</div>`;
+  } else {
+    html += `<div class="warning">自動で "${hdrName}" ヘッダーが見つかりません。行/列を手動で指定してください。</div>`;
+    const candidates = listPartialCandidates(currentSheetTable, hdrName);
+    if(candidates.length){
+      html += `<div>部分一致候補: ${candidates.map(c=>{
+        return `${indexToColumnLabel(c.colIndex+1)}(行${c.rowIndex+1}:'${escapeHtml(c.value.slice(0,20))}')`;
+      }).join(', ')}</div>`;
+    } else {
+      html += `<div>部分一致候補も見つかりません。</div>`;
+    }
+  }
+  html += `</div></fieldset>`;
+  sheetSummary.innerHTML = html;
+  setStatus('シート解析完了。必要ならヘッダー行 / 列を上書きしてください。','success');
+}
+
+/* ===== Header Detection ===== */
+function autoDetectHeader(table, headerName){
+  if(!table.length) return null;
+  const targetNorm = normalizeHeader(headerName);
+  const maxScan = Math.min(table.length, 30);
+  for(let r=0; r<maxScan; r++){
+    for(let c=0;c<table[r].length;c++){
+      if(normalizeHeader(table[r][c]) === targetNorm){
+        return { rowIndex: r, colIndex: c };
+      }
+    }
+  }
+  return null;
+}
+
+function listPartialCandidates(table, headerName){
+  const chars = Array.from(new Set(headerName.split(''))).filter(ch=>ch.trim());
+  const maxScan = Math.min(table.length, 30);
+  const found=[];
+  for(let r=0;r<maxScan;r++){
+    for(let c=0;c<table[r].length;c++){
+      const val = table[r][c];
+      if(!val) continue;
+      if(chars.every(ch=>val.includes(ch))){
+        found.push({rowIndex:r,colIndex:c,value:val});
+      }
+    }
+  }
+  return found;
+}
+
+function resolveHeaderPosition(table, headerName){
+  // 手動優先
+  let rowIdx = null;
+  let colIdx = null;
+
+  if(headerRowOverride.value.trim()){
+    const r = parseInt(headerRowOverride.value.trim(),10);
+    if(!isNaN(r) && r>=1 && r<=table.length) rowIdx = r-1;
+  }
+  if(columnOverride.value.trim()){
+    const raw = columnOverride.value.trim();
+    if(/^[A-Za-z]+$/.test(raw)){
+      const idx = columnLabelToIndex(raw);
+      if(!isNaN(idx)) colIdx = idx-1;
+    } else {
+      const num = parseInt(raw,10);
+      if(!isNaN(num) && num>=1) colIdx = num-1;
+    }
+  }
+
+  if(rowIdx!=null && colIdx!=null){
+    return {rowIndex:rowIdx, colIndex:colIdx};
+  }
+
+  // 自動検出 fallback
+  if(detectedHeader){
+    if(rowIdx==null) rowIdx = detectedHeader.rowIndex;
+    if(colIdx==null) colIdx = detectedHeader.colIndex;
+  }
+
+  if(rowIdx==null || colIdx==null){
+    return {rowIndex:null, colIndex:null};
+  }
+  return {rowIndex:rowIdx, colIndex:colIdx};
+}
+
+/* ===== Shared Strings Parsing ===== */
+function parseSharedStrings(xmlText){
+  if(!xmlText) return {};
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText,'application/xml');
+  const siNodes = Array.from(doc.getElementsByTagName('si'));
+  const out={};
+  siNodes.forEach((si, idx)=>{
+    const runs = Array.from(si.getElementsByTagName('r'));
+    if(!runs.length){
+      const t = si.getElementsByTagName('t')[0];
+      out[idx] = { raw: t ? t.textContent : '', richParts:null };
+    } else {
+      const parts=[];
+      let full='';
+      runs.forEach(r=>{
+        const t=r.getElementsByTagName('t')[0];
+        if(!t) return;
+        const text=t.textContent;
+        full+=text;
+        let isRed=false;
+        const rPr = r.getElementsByTagName('rPr')[0];
+        if(rPr){
+          const colorEl = rPr.getElementsByTagName('color')[0];
+          if(colorEl){
+            const rgb=colorEl.getAttribute('rgb');
+            if(rgb && /FF?0000$/i.test(rgb)) isRed=true;
+          }
+        }
+        parts.push({text,isRed});
+      });
+      out[idx]={ raw: full, richParts: parts };
+    }
+  });
+  return out;
+}
+
+/* ===== Sheet XML Parsing ===== */
+function parseSheetXml(xmlText, sharedMap){
+  const parser=new DOMParser();
+  const doc=parser.parseFromString(xmlText,'application/xml');
+  const rowNodes=Array.from(doc.getElementsByTagName('row'));
+  const table=[];
+  rowNodes.forEach(row=>{
+    const cells=Array.from(row.getElementsByTagName('c'));
+    const outRow=[];
+    cells.forEach(cell=>{
+      const r=cell.getAttribute('r'); // A1
+      const cellType=cell.getAttribute('t'); // s, inlineStr, etc.
+      const vNode=cell.getElementsByTagName('v')[0];
+      const isNode=cell.getElementsByTagName('is')[0];
+      let value='';
+      if(cellType==='s'){ // shared string
+        const idx=vNode ? parseInt(vNode.textContent,10): -1;
+        if(idx>=0 && sharedMap[idx]) value=sharedMap[idx].raw;
+      } else if(cellType==='inlineStr'){
+        value = parseInlineStr(isNode);
+      } else {
+        value = vNode ? vNode.textContent : '';
+      }
+      const colLabel = r.replace(/[0-9]/g,'');
+      const colIndex = columnLabelToIndex(colLabel)-1;
+      outRow[colIndex]=value;
+    });
+    table.push(outRow);
+  });
+  // normalize row lengths
+  const maxLen = table.reduce((m,r)=>Math.max(m,r.length),0);
+  table.forEach(r=>{
+    for(let i=0;i<maxLen;i++){
+      if(typeof r[i]==='undefined') r[i]='';
+    }
+  });
+  return table;
+}
+
+function parseInlineStr(isNode){
+  if(!isNode) return '';
+  const runs = Array.from(isNode.getElementsByTagName('r'));
+  if(!runs.length){
+    const t=isNode.getElementsByTagName('t')[0];
+    return t ? t.textContent : '';
+  }
+  let full='';
+  runs.forEach(r=>{
+    const t=r.getElementsByTagName('t')[0];
+    if(t) full+=t.textContent;
+  });
+  return full;
+}
+
+/* ===== Apply Red Markup ===== */
+function applyRedMarkupToColumn(table, headerRowIndex, colIndex){
+  const clone = table.map(r=>r.slice());
+  // header を含め残り行を red-run 解析
+  const headerVal = clone[headerRowIndex][colIndex];
+  // 既に [[ ]] があるセルはスキップする
+  for(let r=headerRowIndex+1; r<clone.length; r++){
+    const cellText = clone[r][colIndex];
+    if(!cellText) continue;
+    if(cellText.includes('[[') && cellText.includes(']]')) continue;
+
+    // sharedMap から richParts を逆引き (同一文字列で最初マッチ)
+    let rich=null;
+    for(const k in sharedMap){
+      const ent=sharedMap[k];
+      if(ent.richParts && ent.raw === cellText){
+        rich=ent.richParts;
+        break;
+      }
+    }
+    // richParts なしの場合はそのセルは書式情報なし (何もしない)
+    if(rich){
+      clone[r][colIndex] = buildMarkupFromRuns(rich);
+    }
+  }
+  return clone;
+}
+
+function buildMarkupFromRuns(parts){
+  let acc=[];
+  let buf='';
+  let inRed=false;
+  const flush=()=>{
+    if(!buf) return;
+    if(inRed){
+      acc.push(`[[${buf}]]`);
+    } else {
+      acc.push(buf);
+    }
+    buf='';
+  };
+  parts.forEach(p=>{
+    if(p.isRed){
+      if(!inRed){
+        flush();
+        inRed=true;
+      }
+      buf+=p.text;
+    } else {
+      if(inRed){
+        flush();
+        inRed=false;
+      }
+      buf+=p.text;
+    }
+  });
+  flush();
+  return acc.join('');
+}
+
+/* ===== CSV ===== */
+function tableToCSV(table){
+  return table.map(row=>{
+    return row.map(cell=>{
+      let s = cell==null ? '' : String(cell);
+      if(/[",\r\n]/.test(s)){
+        s='"'+s.replace(/"/g,'""')+'"';
+      }
+      return s;
+    }).join(',');
+  }).join('\n');
+}
+
+/* ===== Reset ===== */
+function resetAll(){
+  sheetSelect.innerHTML='';
+  sheetSelect.disabled=true;
+  rescanBtn.disabled=true;
+  startBtn.disabled=true;
+  downloadBtn.disabled=true;
+  csvOutput.value='';
+  sheetSummary.innerHTML='';
+  statusEl.innerHTML='';
+  lastCSV='';
+  sharedMap={};
+  currentSheetTable=[];
+  detectedHeader=null;
+}
+
+/* ===== END ===== */
+</script>
+</body>
+</html>
