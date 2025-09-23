@@ -1,13 +1,15 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14 (min-patch)
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-MODAL
  *
- * 最小パッチ:
- *  - 旧 sticky-active CSS 削除 (index.html)
- *  - 履歴メニュー guard 統合 (guardRender)
- *  - [[ ]] MutationObserver fallback 削除 (冗長化したため)
+ * 追加:
+ *  - Home 全身図ギャラリー (ドロップダウン切替)
+ *  - 画像クリックでモーダル拡大 (前/次/Esc/左右キー対応)
+ *  - 最後に選択した画像を localStorage に保存
+ *  - Home 状態のみギャラリー表示、それ以外は自動非表示
+ * 既存最小パッチ: history guard 統合 / 旧 sticky & MutationObserver [[ ]] fallback 削除 済
  ******************************************************/
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-MODAL';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -68,6 +70,21 @@ const pointHistoryBtn = document.getElementById('point-history-btn');
 const pointHistoryMenu = document.getElementById('point-history-menu');
 const pointHistoryMenuList = document.getElementById('point-history-menu-list');
 
+/* Home ギャラリー要素 */
+const homeGallerySection = document.getElementById('home-gallery-section');
+const homeGallerySelect  = document.getElementById('home-gallery-select');
+const homeGalleryImage   = document.getElementById('home-gallery-image');
+const homeGalleryFallback= document.getElementById('home-gallery-fallback');
+
+/* モーダル要素 */
+const modalOverlay  = document.getElementById('gallery-modal-overlay');
+const modalImage    = document.getElementById('gallery-modal-image');
+const modalCloseBtn = document.getElementById('gallery-modal-close');
+const modalClose2   = document.getElementById('gm-close2');
+const modalPrevBtn  = document.getElementById('gm-prev');
+const modalNextBtn  = document.getElementById('gm-next');
+const modalIndexLabel = document.getElementById('gm-index-label');
+
 let historyStack = [];
 let historyIndex = -1;
 let IS_APPLYING_HISTORY = false;
@@ -76,7 +93,169 @@ let patternHistory = [];
 let pointHistory   = [];
 const HISTORY_LIMIT = 300;
 
-/* Utility */
+/* ========== Home 全身図ギャラリー定義 & モーダル ========== */
+
+const HOME_GALLERY_IMAGES = [
+  { file: '十四経経脈経穴図_1.前面.jpeg',        label: '① 前面' },
+  { file: '十四経経脈経穴図_2.後面.jpeg',        label: '② 後面' },
+  { file: '十四経経脈経穴図_3.後面(骨格).jpeg', label: '③ 後面 (骨格)' },
+  { file: '十四経経脈経穴図_4.側面(筋肉).jpeg', label: '④ 側面 (筋肉)' }
+];
+const HOME_GALLERY_LS_KEY = 'homeGallery.lastFile';
+
+/* ギャラリー初期化 */
+function initHomeGallery(){
+  if(!homeGallerySelect) return;
+  homeGallerySelect.innerHTML='';
+  const saved = localStorage.getItem(HOME_GALLERY_LS_KEY);
+  let initialIdx = 0;
+  if(saved){
+    const idx = HOME_GALLERY_IMAGES.findIndex(i=>i.file===saved);
+    if(idx>=0) initialIdx=idx;
+  }
+  HOME_GALLERY_IMAGES.forEach((img,idx)=>{
+    const opt=document.createElement('option');
+    opt.value=img.file;
+    opt.textContent=img.label;
+    if(idx===initialIdx) opt.selected=true;
+    homeGallerySelect.appendChild(opt);
+  });
+  if(HOME_GALLERY_IMAGES[initialIdx]){
+    updateHomeGalleryImage(HOME_GALLERY_IMAGES[initialIdx].file,false);
+  }
+}
+
+/* 画像読み込み */
+function updateHomeGalleryImage(file, store=true){
+  if(!homeGalleryImage) return;
+  const url='image/'+encodeURI(file)+'?v='+APP_VERSION;
+  homeGalleryFallback.classList.add('hidden');
+  homeGalleryImage.classList.remove('hidden');
+  homeGalleryImage.alt = file.replace(/\.(jpeg|jpg|png)$/i,'');
+  homeGalleryImage.onload=()=>{};
+  homeGalleryImage.onerror=()=>{
+    homeGalleryImage.classList.add('hidden');
+    homeGalleryFallback.classList.remove('hidden');
+  };
+  homeGalleryImage.src=url;
+  if(store){
+    try{ localStorage.setItem(HOME_GALLERY_LS_KEY,file); }catch(_){}
+  }
+}
+
+/* 表示 / 非表示 */
+function showHomeGallery(){ if(homeGallerySection) homeGallerySection.classList.remove('hidden'); }
+function hideHomeGallery(){ if(homeGallerySection) homeGallerySection.classList.add('hidden'); }
+
+if(homeGallerySelect){
+  homeGallerySelect.addEventListener('change', ()=>{
+    const f=homeGallerySelect.value;
+    if(f) updateHomeGalleryImage(f,true);
+  });
+}
+
+/* モーダル制御 */
+let currentGalleryIndex = 0;
+
+function openGalleryModal(indexFromSelect=false){
+  if(!homeGalleryImage || !modalOverlay) return;
+  // 現在選択から index を確定
+  const file = homeGallerySelect?.value;
+  let idx = HOME_GALLERY_IMAGES.findIndex(i=>i.file===file);
+  if(idx<0) idx=0;
+  currentGalleryIndex = idx;
+  renderModalImage();
+  modalOverlay.classList.remove('hidden');
+  modalOverlay.scrollTop = 0;
+  modalCloseBtn.focus();
+}
+
+function closeGalleryModal(){
+  if(!modalOverlay) return;
+  modalOverlay.classList.add('hidden');
+}
+
+function renderModalImage(){
+  const item = HOME_GALLERY_IMAGES[currentGalleryIndex];
+  if(!item) return;
+  const url='image/'+encodeURI(item.file)+'?v='+APP_VERSION;
+  modalImage.src=url;
+  modalImage.alt=item.label;
+  if(modalIndexLabel){
+    modalIndexLabel.textContent=`${currentGalleryIndex+1} / ${HOME_GALLERY_IMAGES.length} : ${item.label}`;
+  }
+  updateModalNavButtons();
+  preloadAdjacent();
+}
+
+function updateModalNavButtons(){
+  if(!modalPrevBtn || !modalNextBtn) return;
+  modalPrevBtn.disabled = (currentGalleryIndex<=0);
+  modalNextBtn.disabled = (currentGalleryIndex>=HOME_GALLERY_IMAGES.length-1);
+}
+
+function goModalPrev(){
+  if(currentGalleryIndex>0){
+    currentGalleryIndex--;
+    renderModalImage();
+  }
+}
+function goModalNext(){
+  if(currentGalleryIndex < HOME_GALLERY_IMAGES.length-1){
+    currentGalleryIndex++;
+    renderModalImage();
+  }
+}
+
+/* 先読み（前後1枚） */
+function preloadAdjacent(){
+  [currentGalleryIndex-1, currentGalleryIndex+1].forEach(i=>{
+    if(i>=0 && i<HOME_GALLERY_IMAGES.length){
+      const img=new Image();
+      img.src='image/'+encodeURI(HOME_GALLERY_IMAGES[i].file)+'?v='+APP_VERSION;
+    }
+  });
+}
+
+/* ギャラリー画像クリックでモーダル */
+if(homeGalleryImage){
+  homeGalleryImage.addEventListener('click', ()=>{
+    if(homeGallerySection && !homeGallerySection.classList.contains('hidden')){
+      openGalleryModal(true);
+    }
+  });
+  homeGalleryImage.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' || e.key===' '){
+      e.preventDefault();
+      if(homeGallerySection && !homeGallerySection.classList.contains('hidden')){
+        openGalleryModal(true);
+      }
+    }
+  });
+}
+
+/* モーダル操作イベント */
+if(modalCloseBtn) modalCloseBtn.addEventListener('click', closeGalleryModal);
+if(modalClose2)  modalClose2.addEventListener('click', closeGalleryModal);
+if(modalOverlay){
+  modalOverlay.addEventListener('click', e=>{
+    if(e.target===modalOverlay) closeGalleryModal();
+  });
+}
+if(modalPrevBtn) modalPrevBtn.addEventListener('click', goModalPrev);
+if(modalNextBtn) modalNextBtn.addEventListener('click', goModalNext);
+
+/* キーボード */
+document.addEventListener('keydown', e=>{
+  if(modalOverlay && !modalOverlay.classList.contains('hidden')){
+    if(e.key==='Escape'){ closeGalleryModal(); }
+    else if(e.key==='ArrowLeft'){ goModalPrev(); }
+    else if(e.key==='ArrowRight'){ goModalNext(); }
+  }
+});
+
+/* ========== 共通ユーティリティ & 既存ロジック ========== */
+
 function isShown(el){ return el && !el.classList.contains('hidden'); }
 function statesEqual(a,b){
   if(!a||!b) return false;
@@ -105,11 +284,10 @@ function updateHistoryBadge(){
   }
 }
 
-/* History push/apply */
+/* push/apply */
 function pushState(state, replace=false){
   if(IS_APPLYING_HISTORY) return;
   const prevState = historyStack[historyIndex] || null;
-
   state.showPoint   = state.showPoint   !== undefined ? state.showPoint   : isShown(inlineAcupointResult);
   state.showPattern = state.showPattern !== undefined ? state.showPattern : isShown(clinicalResultEl);
 
@@ -120,7 +298,6 @@ function pushState(state, replace=false){
   } else if(state.type==='pattern'){
     state.showPattern=true;
   }
-
   if(prevState){
     if(state.type==='pattern' && prevState.showPoint) state.showPoint = true;
     if((state.type==='point'||state.type==='unknownPoint') && prevState.showPattern) state.showPattern = true;
@@ -195,6 +372,13 @@ function applyState(state){
         break;
     }
 
+    // Home ギャラリー表示制御
+    if(state.type === 'home'){
+      showHomeGallery();
+    } else {
+      hideHomeGallery();
+    }
+
     if(showPointFlag){
       inlineAcupointResult.classList.remove('hidden');
       if((state.type!=='point' && state.type!=='unknownPoint')
@@ -207,7 +391,6 @@ function applyState(state){
       inlineAcupointResult.classList.add('hidden');
       hideMeridianImage();
     }
-
     if(showPatternFlag){
       clinicalResultEl.classList.remove('hidden');
     } else {
@@ -228,7 +411,7 @@ function formatTime(ts){
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/* History menus: primary + fallback + guard */
+/* History menus 基本 + fallback + guard */
 function renderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML='';
   const arr=[...patternHistory].reverse();
@@ -251,15 +434,14 @@ function renderPatternHistoryMenu(){
       patternHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
       const clone = {...st};
-      const pointCurrentlyShown = isShown(inlineAcupointResult);
-      clone.showPoint = pointCurrentlyShown ? true : false;
+      const pointShown = isShown(inlineAcupointResult);
+      clone.showPoint = pointShown;
       clone.showPattern = true;
       applyState(clone);
     });
     patternHistoryMenuList.appendChild(li);
   });
 }
-
 function renderPointHistoryMenu(){
   pointHistoryMenuList.innerHTML='';
   const arr=[...pointHistory].reverse();
@@ -282,16 +464,14 @@ function renderPointHistoryMenu(){
       pointHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
       const clone = {...st};
-      const patternCurrentlyShown = isShown(clinicalResultEl);
-      clone.showPattern = patternCurrentlyShown ? true : false;
+      const patternShown = isShown(clinicalResultEl);
+      clone.showPattern = patternShown;
       clone.showPoint = true;
       applyState(clone);
     });
     pointHistoryMenuList.appendChild(li);
   });
 }
-
-/* FALLBACKS */
 function fallbackRenderPointHistoryMenu(){
   pointHistoryMenuList.innerHTML = pointHistory.length
     ? pointHistory.slice().reverse().map(h=>{
@@ -314,8 +494,6 @@ function fallbackRenderPatternHistoryMenu(){
       }).join('')
     : '<li>履歴なし</li>';
 }
-
-/* 統合ガード */
 function guardRender(renderFn, fallbackFn, kind){
   try{
     if(typeof renderFn!=='function' || !/innerHTML/.test(renderFn.toString())){
@@ -565,7 +743,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* Clinical CSV */
+/* Clinical CSV (長いためそのまま) */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -705,7 +883,7 @@ function parseClinicalCSV(raw){
           i++;
         } else {
           const next=table[i+1]||[];
-          const commentRow=isPotentialCommentRow(next)? next:null;
+            const commentRow=isPotentialCommentRow(next)? next:null;
           patternNames.forEach((pName,idx)=>{
             const col=idx+1;
             const cell=r[col]||'';
@@ -892,7 +1070,7 @@ function linkifyRegionAcupoints(html){
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
           const a=document.createElement('a');
-          a.href='#';
+            a.href='#';
           a.className='treat-point-link';
           const p=findAcupointByToken(matched);
           if(p && p.important) a.classList.add('acu-important');
@@ -938,6 +1116,7 @@ function updateMeridianImage(meridian){
 
 /* Detail display */
 function showPointDetail(p, suppressHistory=false){
+  hideHomeGallery(); /* ギャラリーを確実に隠す */
   let regionHTML=p.region||'';
   if(regionHTML.includes('[[')){
     regionHTML = p.regionRaw? applyRedMarkup(p.regionRaw): applyRedMarkup(regionHTML);
@@ -951,16 +1130,15 @@ function showPointDetail(p, suppressHistory=false){
     resultImportantEl.innerHTML=`<span class="acu-important-flag">${escapeHTML(p.important)}</span>`;
   } else resultImportantEl.textContent='-';
   if(resultMuscleEl) resultMuscleEl.textContent=p.muscle||'（筋肉未登録）';
-
   renderRelatedPatterns(p.name);
   inlineAcupointResult.classList.remove('hidden');
   updateMeridianImage(p.meridian||'');
-
   if(!suppressHistory && !IS_APPLYING_HISTORY){
     pushState({type:'point',name:p.name});
   }
   requestAnimationFrame(equalizeTopCards);
 }
+
 function renderRelatedPatterns(pointName){
   relatedSymptomsEl.innerHTML='';
   if(!CLINICAL_READY || !ACUPOINT_PATTERN_INDEX[pointName] || !ACUPOINT_PATTERN_INDEX[pointName].length){
@@ -974,6 +1152,7 @@ function renderRelatedPatterns(pointName){
   });
 }
 function showUnknownPoint(name, suppressHistory=false){
+  hideHomeGallery();
   resultNameEl.textContent=`${name}（未登録）`;
   resultNameEl.classList.remove('is-important');
   resultMeridianEl.textContent='（経絡未登録）';
@@ -1014,6 +1193,7 @@ categorySelect.addEventListener('change', ()=>{
 
 patternSelect.addEventListener('change', ()=>{
   try{
+    hideHomeGallery();
     const cat=categorySelect.value;
     const pat=patternSelect.value;
     clinicalResultEl.classList.add('hidden');
@@ -1065,7 +1245,6 @@ document.addEventListener('click', e=>{
   patternSelect.value=pat;
   patternSelect.dispatchEvent(new Event('change'));
 });
-
 document.addEventListener('click', e=>{
   const a=e.target.closest('.treat-point-link');
   if(!a) return;
@@ -1090,6 +1269,7 @@ function goHome(suppressHistory=false){
   const span=clinicalTitleEl.querySelector('.pattern-name-highlight');
   if(span) span.textContent='';
   relatedSymptomsEl.innerHTML='<li>-</li>';
+  showHomeGallery();
   window.scrollTo({top:0,behavior:'smooth'});
   requestAnimationFrame(()=>{ inputEl.focus(); inputEl.select(); });
   requestAnimationFrame(equalizeTopCards);
@@ -1103,7 +1283,7 @@ homeBtn.addEventListener('click', ()=>goHome());
 backBtn.addEventListener('click', goBack);
 forwardBtn.addEventListener('click', goForward);
 document.addEventListener('keydown', e=>{
-  if(e.altKey && !e.metaKey && !e.shiftKey){
+  if(e.altKey && !e.metaKey && !e.shiftKey && !e.ctrlKey){
     if(e.key==='ArrowLeft') goBack();
     else if(e.key==='ArrowRight') goForward();
   }
@@ -1189,12 +1369,14 @@ function init(){
   try{
     loadAcuCSV();
     loadClinicalCSV();
+    initHomeGallery();
     updateNavButtons();
     requestAnimationFrame(equalizeTopCards);
     requestAnimationFrame(()=>{ inputEl.focus(); inputEl.select(); });
     const waitReady=setInterval(()=>{
       if((DATA_READY || CLINICAL_READY) && historyStack.length===0){
         pushState({type:'home'});
+        showHomeGallery();
       }
       if(DATA_READY && CLINICAL_READY){
         clearInterval(waitReady);
@@ -1209,5 +1391,4 @@ function init(){
 window.addEventListener('resize', equalizeTopCards);
 init();
 
-/* NOTE: [[ ]] MutationObserver fallback 削除済
-   showPointDetail 内で regionHTML を確定生成するため不要 */
+/* NOTE: [[ ]] MutationObserver fallback 不要 (showPointDetail で確定生成) */
