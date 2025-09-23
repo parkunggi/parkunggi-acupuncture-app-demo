@@ -89,8 +89,20 @@ function statesEqual(a,b){
 function updateNavButtons(){
   backBtn.disabled = (historyIndex <= 0);
   forwardBtn.disabled = (historyIndex < 0 || historyIndex >= historyStack.length - 1);
-  if(!patternHistoryMenu.classList.contains('hidden')) renderPatternHistoryMenu();
-  if(!pointHistoryMenu.classList.contains('hidden')) renderPointHistoryMenu();
+  if(!patternHistoryMenu.classList.contains('hidden')) safeRenderPatternHistoryMenu();
+  if(!pointHistoryMenu.classList.contains('hidden')) safeRenderPointHistoryMenu();
+}
+
+/* --- FIX A HISTORY: バッジ表示補助 --- */
+function updateHistoryBadge(){
+  if(pointHistoryBtn){
+    pointHistoryBtn.title = `経穴 履歴 (Acupoint) - ${pointHistory.length}件`;
+    pointHistoryBtn.dataset.count = pointHistory.length;
+  }
+  if(patternHistoryBtn){
+    patternHistoryBtn.title = `治療方針 履歴 (Pattern) - ${patternHistory.length}件`;
+    patternHistoryBtn.dataset.count = patternHistory.length;
+  }
 }
 
 /* History push/apply */
@@ -137,6 +149,7 @@ function pushState(state, replace=false){
       if(pointHistory.length>HISTORY_LIMIT) pointHistory.shift();
     }
   }
+  updateHistoryBadge(); /* FIX A HISTORY: 件数反映 */
   updateNavButtons();
 }
 
@@ -174,7 +187,7 @@ function applyState(state){
             categorySelect.value=state.cat;
             categorySelect.dispatchEvent(new Event('change'));
           }
-            if(state.pattern){
+          if(state.pattern){
             patternSelect.value=state.pattern;
             patternSelect.dispatchEvent(new Event('change'));
           }
@@ -215,7 +228,7 @@ function formatTime(ts){
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/* History menus */
+/* History menus (オリジナル関数は保持) */
 function renderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML='';
   const arr=[...patternHistory].reverse();
@@ -274,8 +287,83 @@ function renderPointHistoryMenu(){
       clone.showPoint = true;
       applyState(clone);
     });
-    patternHistoryMenuList.appendChild(li);
+    pointHistoryMenuList.appendChild(li);
   });
+}
+
+/* --- FIX A HISTORY: 安全ラッパ & 整合性チェック --- */
+function ensureHistoryMenuIntegrity(kind){
+  try{
+    if(kind==='point'){
+      if(pointHistory.length && !pointHistoryMenuList.querySelector('li')){
+        console.warn('[HISTORY-GUARD] point menu empty after render, rebuilding fallback');
+        fallbackRenderPointHistoryMenu();
+      }
+    } else if(kind==='pattern'){
+      if(patternHistory.length && !patternHistoryMenuList.querySelector('li')){
+        console.warn('[HISTORY-GUARD] pattern menu empty after render, rebuilding fallback');
+        fallbackRenderPatternHistoryMenu();
+      }
+    }
+  }catch(e){
+    console.error('[HISTORY-GUARD] integrity check error', e);
+  }
+}
+
+function fallbackRenderPointHistoryMenu(){
+  pointHistoryMenuList.innerHTML = pointHistory.length
+    ? pointHistory.slice().reverse().map(h=>{
+        const st=h.ref||{};
+        const label = st && st.type==='unknownPoint' ? `未登録: ${st.name}` : `経穴: ${st?.name||'(不明)'}`;
+        return `<li><div style="display:flex;align-items:center;gap:6px;">
+          <span class="hist-time">${formatTime(h.ts)}</span></div>
+          <div class="hist-label">${escapeHTML(label)}</div></li>`;
+      }).join('')
+    : '<li>履歴なし</li>';
+}
+
+function fallbackRenderPatternHistoryMenu(){
+  patternHistoryMenuList.innerHTML = patternHistory.length
+    ? patternHistory.slice().reverse().map(h=>{
+        const st=h.ref||{};
+        const label = `病証: ${st?.cat||'?'} / ${st?.pattern||'?'}`;
+        return `<li><div style="display:flex;align-items:center;gap:6px;">
+          <span class="hist-time">${formatTime(h.ts)}</span></div>
+          <div class="hist-label">${escapeHTML(label)}</div></li>`;
+      }).join('')
+    : '<li>履歴なし</li>';
+}
+
+function safeRenderPointHistoryMenu(){
+  try {
+    if(typeof renderPointHistoryMenu!=='function'
+       || !/pointHistoryMenuList\.innerHTML/.test(renderPointHistoryMenu.toString())){
+      console.warn('[HISTORY-GUARD] renderPointHistoryMenu overwritten. Using fallback.');
+      fallbackRenderPointHistoryMenu();
+    } else {
+      renderPointHistoryMenu();
+    }
+  } catch(e){
+    console.error('[HISTORY-GUARD] safeRenderPointHistoryMenu error, fallback', e);
+    fallbackRenderPointHistoryMenu();
+  }
+  ensureHistoryMenuIntegrity('point');
+}
+
+function safeRenderPatternHistoryMenu(){
+  try {
+    if(typeof renderPatternHistoryMenu!=='function'
+       || !/patternHistoryMenuList\.innerHTML/.test(renderPatternHistoryMenu.toString())){
+      console.warn('[HISTORY-GUARD] renderPatternHistoryMenu overwritten. Using fallback.');
+      fallbackRenderPatternHistoryMenu();
+    } else {
+      renderPatternHistoryMenu();
+    }
+  } catch(e){
+    console.error('[HISTORY-GUARD] safeRenderPatternHistoryMenu error, fallback', e);
+    fallbackRenderPatternHistoryMenu();
+  }
+  ensureHistoryMenuIntegrity('pattern');
 }
 
 /* Menu toggles */
@@ -283,7 +371,7 @@ if(patternHistoryBtn){
   patternHistoryBtn.addEventListener('click', ()=>{
     pointHistoryMenu.classList.add('hidden');
     if(patternHistoryMenu.classList.contains('hidden')){
-      renderPatternHistoryMenu();
+      safeRenderPatternHistoryMenu(); /* FIX A HISTORY */
       patternHistoryMenu.classList.remove('hidden');
     } else patternHistoryMenu.classList.add('hidden');
   });
@@ -292,7 +380,7 @@ if(pointHistoryBtn){
   pointHistoryBtn.addEventListener('click', ()=>{
     patternHistoryMenu.classList.add('hidden');
     if(pointHistoryMenu.classList.contains('hidden')){
-      renderPointHistoryMenu();
+      safeRenderPointHistoryMenu(); /* FIX A HISTORY */
       pointHistoryMenu.classList.remove('hidden');
     } else pointHistoryMenu.classList.add('hidden');
   });
@@ -405,7 +493,7 @@ function parseAcuCSV(raw){
   return results;
 }
 
-/* Treatment token utilities (修正: 記号単独トークン除外) */
+/* Treatment token utilities */
 function parseTreatmentPoints(raw){
   if(!raw) return [];
   const stripped = raw
@@ -506,7 +594,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* Clinical CSV */
+/* Clinical CSV 省略せず（元実装そのまま） */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -638,7 +726,7 @@ function parseClinicalCSV(raw){
         const inter=isInterleavedTreatmentRow(after, patternNames.length);
         if(inter){
           const groups=parseInterleavedRow(after, patternNames);
-            groups.forEach(g=>{
+          groups.forEach(g=>{
             data.cats[category].patterns[g.pattern].push({
               label:g.label, rawPoints:g.rawPoints, comment:g.comment
             });
