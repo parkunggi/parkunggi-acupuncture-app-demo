@@ -1,11 +1,11 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14 (min-patch)
  *
- * IMGFIX14:
- *  - 経絡イメージセクションを治療方針セクション直下・同幅に配置しタイトル除去
- *  - parseTreatmentPoints で記号単独(※・など)トークンを除外し「※」がリンク化される問題修正
- *  - 他ロジックは IMGFIX13 相当
+ * 最小パッチ:
+ *  - 旧 sticky-active CSS 削除 (index.html)
+ *  - 履歴メニュー guard 統合 (guardRender)
+ *  - [[ ]] MutationObserver fallback 削除 (冗長化したため)
  ******************************************************/
 const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14';
 
@@ -93,7 +93,7 @@ function updateNavButtons(){
   if(!pointHistoryMenu.classList.contains('hidden')) safeRenderPointHistoryMenu();
 }
 
-/* --- FIX A HISTORY: バッジ表示補助 --- */
+/* History badge */
 function updateHistoryBadge(){
   if(pointHistoryBtn){
     pointHistoryBtn.title = `経穴 履歴 (Acupoint) - ${pointHistory.length}件`;
@@ -149,7 +149,7 @@ function pushState(state, replace=false){
       if(pointHistory.length>HISTORY_LIMIT) pointHistory.shift();
     }
   }
-  updateHistoryBadge(); /* FIX A HISTORY: 件数反映 */
+  updateHistoryBadge();
   updateNavButtons();
 }
 
@@ -228,7 +228,7 @@ function formatTime(ts){
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/* History menus (オリジナル関数は保持) */
+/* History menus: primary + fallback + guard */
 function renderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML='';
   const arr=[...patternHistory].reverse();
@@ -291,25 +291,7 @@ function renderPointHistoryMenu(){
   });
 }
 
-/* --- FIX A HISTORY: 安全ラッパ & 整合性チェック --- */
-function ensureHistoryMenuIntegrity(kind){
-  try{
-    if(kind==='point'){
-      if(pointHistory.length && !pointHistoryMenuList.querySelector('li')){
-        console.warn('[HISTORY-GUARD] point menu empty after render, rebuilding fallback');
-        fallbackRenderPointHistoryMenu();
-      }
-    } else if(kind==='pattern'){
-      if(patternHistory.length && !patternHistoryMenuList.querySelector('li')){
-        console.warn('[HISTORY-GUARD] pattern menu empty after render, rebuilding fallback');
-        fallbackRenderPatternHistoryMenu();
-      }
-    }
-  }catch(e){
-    console.error('[HISTORY-GUARD] integrity check error', e);
-  }
-}
-
+/* FALLBACKS */
 function fallbackRenderPointHistoryMenu(){
   pointHistoryMenuList.innerHTML = pointHistory.length
     ? pointHistory.slice().reverse().map(h=>{
@@ -321,7 +303,6 @@ function fallbackRenderPointHistoryMenu(){
       }).join('')
     : '<li>履歴なし</li>';
 }
-
 function fallbackRenderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML = patternHistory.length
     ? patternHistory.slice().reverse().map(h=>{
@@ -334,44 +315,34 @@ function fallbackRenderPatternHistoryMenu(){
     : '<li>履歴なし</li>';
 }
 
-function safeRenderPointHistoryMenu(){
-  try {
-    if(typeof renderPointHistoryMenu!=='function'
-       || !/pointHistoryMenuList\.innerHTML/.test(renderPointHistoryMenu.toString())){
-      console.warn('[HISTORY-GUARD] renderPointHistoryMenu overwritten. Using fallback.');
-      fallbackRenderPointHistoryMenu();
-    } else {
-      renderPointHistoryMenu();
+/* 統合ガード */
+function guardRender(renderFn, fallbackFn, kind){
+  try{
+    if(typeof renderFn!=='function' || !/innerHTML/.test(renderFn.toString())){
+      console.warn(`[HISTORY-GUARD] ${kind} renderer overwritten. fallback`);
+      fallbackFn(); return;
     }
-  } catch(e){
-    console.error('[HISTORY-GUARD] safeRenderPointHistoryMenu error, fallback', e);
-    fallbackRenderPointHistoryMenu();
-  }
-  ensureHistoryMenuIntegrity('point');
-}
-
-function safeRenderPatternHistoryMenu(){
-  try {
-    if(typeof renderPatternHistoryMenu!=='function'
-       || !/patternHistoryMenuList\.innerHTML/.test(renderPatternHistoryMenu.toString())){
-      console.warn('[HISTORY-GUARD] renderPatternHistoryMenu overwritten. Using fallback.');
-      fallbackRenderPatternHistoryMenu();
-    } else {
-      renderPatternHistoryMenu();
+    renderFn();
+    const listEl = kind==='point'? pointHistoryMenuList : patternHistoryMenuList;
+    const arr = kind==='point'? pointHistory : patternHistory;
+    if(arr.length && !listEl.querySelector('li')){
+      console.warn(`[HISTORY-GUARD] ${kind} menu empty after render. fallback rebuild.`);
+      fallbackFn();
     }
-  } catch(e){
-    console.error('[HISTORY-GUARD] safeRenderPatternHistoryMenu error, fallback', e);
-    fallbackRenderPatternHistoryMenu();
+  }catch(e){
+    console.error(`[HISTORY-GUARD] ${kind} render error`, e);
+    fallbackFn();
   }
-  ensureHistoryMenuIntegrity('pattern');
 }
+function safeRenderPointHistoryMenu(){ guardRender(renderPointHistoryMenu, fallbackRenderPointHistoryMenu, 'point'); }
+function safeRenderPatternHistoryMenu(){ guardRender(renderPatternHistoryMenu, fallbackRenderPatternHistoryMenu, 'pattern'); }
 
 /* Menu toggles */
 if(patternHistoryBtn){
   patternHistoryBtn.addEventListener('click', ()=>{
     pointHistoryMenu.classList.add('hidden');
     if(patternHistoryMenu.classList.contains('hidden')){
-      safeRenderPatternHistoryMenu(); /* FIX A HISTORY */
+      safeRenderPatternHistoryMenu();
       patternHistoryMenu.classList.remove('hidden');
     } else patternHistoryMenu.classList.add('hidden');
   });
@@ -380,7 +351,7 @@ if(pointHistoryBtn){
   pointHistoryBtn.addEventListener('click', ()=>{
     patternHistoryMenu.classList.add('hidden');
     if(pointHistoryMenu.classList.contains('hidden')){
-      safeRenderPointHistoryMenu(); /* FIX A HISTORY */
+      safeRenderPointHistoryMenu();
       pointHistoryMenu.classList.remove('hidden');
     } else pointHistoryMenu.classList.add('hidden');
   });
@@ -594,7 +565,7 @@ function buildPointsHTML(rawPoints, tokens){
   return out;
 }
 
-/* Clinical CSV 省略せず（元実装そのまま） */
+/* Clinical CSV */
 function rebuildLogicalRows(raw){
   const physical=raw.replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
@@ -1238,20 +1209,5 @@ function init(){
 window.addEventListener('resize', equalizeTopCards);
 init();
 
-/* [[ ]] fallback */
-(function installRegionFallback(){
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const container=document.getElementById('inline-acupoint-result');
-    if(!container) return;
-    const patch=()=>{
-      const el=document.getElementById('result-region');
-      if(el && el.innerHTML && el.innerHTML.includes('[[')){
-        el.innerHTML=applyRedMarkup(el.innerHTML);
-        el.innerHTML=linkifyRegionAcupoints(el.innerHTML);
-      }
-    };
-    const mo=new MutationObserver(patch);
-    mo.observe(container,{childList:true,subtree:true,characterData:true});
-    patch();
-  });
-})();
+/* NOTE: [[ ]] MutationObserver fallback 削除済
+   showPointDetail 内で regionHTML を確定生成するため不要 */
