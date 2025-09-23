@@ -174,7 +174,7 @@ function applyState(state){
             categorySelect.value=state.cat;
             categorySelect.dispatchEvent(new Event('change'));
           }
-          if(state.pattern){
+            if(state.pattern){
             patternSelect.value=state.pattern;
             patternSelect.dispatchEvent(new Event('change'));
           }
@@ -274,7 +274,7 @@ function renderPointHistoryMenu(){
       clone.showPoint = true;
       applyState(clone);
     });
-    pointHistoryMenuList.appendChild(li);
+    patternHistoryMenuList.appendChild(li);
   });
 }
 
@@ -423,7 +423,7 @@ function parseTreatmentPoints(raw){
     .filter(t=>t.length)
     .map(t=>t.replace(/[。.,、，;；/]+$/,''))
     .filter(Boolean)
-    .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));  // ここで記号のみは除外
+    .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));
 }
 function normalizeAcuLookupName(name){
   return removeAllUnicodeSpaces(name||'').trim();
@@ -479,7 +479,7 @@ function buildPointsHTML(rawPoints, tokens){
   while(i<len){
     const ch=rawPoints[i];
     if(ch==='('||ch==='（'){
-      const closeChar=ch==='(' ? ')' : '）';
+      const closeChar=ch==='( ? ')' : '）';
       let j=i+1; while(j<len && rawPoints[j]!==closeChar) j++;
       if(j<len) j++;
       out+=linkifyParenthesisGroup(rawPoints.slice(i,j));
@@ -638,7 +638,7 @@ function parseClinicalCSV(raw){
         const inter=isInterleavedTreatmentRow(after, patternNames.length);
         if(inter){
           const groups=parseInterleavedRow(after, patternNames);
-          groups.forEach(g=>{
+            groups.forEach(g=>{
             data.cats[category].patterns[g.pattern].push({
               label:g.label, rawPoints:g.rawPoints, comment:g.comment
             });
