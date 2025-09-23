@@ -479,7 +479,7 @@ function buildPointsHTML(rawPoints, tokens){
   while(i<len){
     const ch=rawPoints[i];
     if(ch==='('||ch==='（'){
-      const closeChar=ch==='( ? ')' : '）';
+      const closeChar = ch==='(' ? ')' : '）';
       let j=i+1; while(j<len && rawPoints[j]!==closeChar) j++;
       if(j<len) j++;
       out+=linkifyParenthesisGroup(rawPoints.slice(i,j));
