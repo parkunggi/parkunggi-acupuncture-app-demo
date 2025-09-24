@@ -1,20 +1,15 @@
 /******************************************************
  * 経穴検索 + 臨床病証 + 履歴ナビ + 部位内経穴リンク化 + 経絡イメージ + Home全身図ギャラリー
- * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-FIXPATTERN
+ * APP_VERSION 20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-FIXPATTERN-HISTORYFIX
  *
- * 本版での主な差分:
- *  - parseClinicalCSV 内の病証パターン見出し行ループのバグ修正
- *    (誤: const name = trimOuter(c = pRow[c]); により for ループ変数上書き ⇒ 1件のみ)
- *    (正: for (let col=1; col<pRow.length; col++) { const name = trimOuter(pRow[col]); ... })
- *  - Home ギャラリー（モーダルなし）を含む最新安定版
- *
- * 既存改善点:
- *  - history guard 統合
- *  - MutationObserver ([[ ]]) fallback 削除
- *  - sticky CSS シンプル化
+ * 本版:
+ *  - parseClinicalCSV ループバグ修正済
+ *  - パターン履歴(P)でカテゴリ名を表示しない
+ *  - 履歴メニュー関数重複/破損部 (SyntaxError) を整理
+ *  - 旧 MutationObserver / 旧 sticky / 不要コード削除済
  ******************************************************/
 
-const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-FIXPATTERN';
+const APP_VERSION = '20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-FIXPATTERN-HISTORYFIX';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -330,6 +325,7 @@ function formatTime(ts){
 }
 
 /* ------------ 履歴メニュー (guard付き) ------------ */
+/* P: Pattern history (カテゴリ非表示) */
 function renderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML='';
   const arr=[...patternHistory].reverse();
@@ -342,7 +338,7 @@ function renderPatternHistoryMenu(){
     const st=entry.ref;
     const li=document.createElement('li');
     if(st===current) li.classList.add('active');
-    const label = transformPatternDisplay(st.pattern); // カテゴリ名削除
+    const label = transformPatternDisplay(st.pattern); // カテゴリ表示除外
     li.innerHTML=`
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="hist-time">${formatTime(entry.ts)}</span>
@@ -352,32 +348,39 @@ function renderPatternHistoryMenu(){
       patternHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
       const clone = {...st};
-      const pointShown = isShown(inlineAcupointResult);
-      clone.showPoint = pointShown;
+      clone.showPoint   = isShown(inlineAcupointResult);
       clone.showPattern = true;
       applyState(clone);
     });
     patternHistoryMenuList.appendChild(li);
   });
 }
-
 function fallbackRenderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML = patternHistory.length
     ? patternHistory.slice().reverse().map(h=>{
         const st=h.ref||{};
-        const label = transformPatternDisplay(st?.pattern||'?'); // カテゴリ名削除
+        const label = transformPatternDisplay(st?.pattern||'?');
         return `<li><div style="display:flex;align-items:center;gap:6px;">
           <span class="hist-time">${formatTime(h.ts)}</span></div>
           <div class="hist-label">${escapeHTML(label)}</div></li>`;
       }).join('')
     : '<li>履歴なし</li>';
 }
+
+/* A: Point history */
+function renderPointHistoryMenu(){
+  pointHistoryMenuList.innerHTML='';
+  const arr=[...pointHistory].reverse();
+  if(!arr.length){
+    const li=document.createElement('li'); li.textContent='履歴なし';
+    pointHistoryMenuList.appendChild(li); return;
+  }
   const current=historyStack[historyIndex];
   arr.forEach(entry=>{
     const st=entry.ref;
     const li=document.createElement('li');
     if(st===current) li.classList.add('active');
-    const label = (st.type==='unknownPoint')?`未登録: ${st.name}`:`経穴: ${st.name}`;
+    const label = (st.type==='unknownPoint') ? `未登録: ${st.name}` : `経穴: ${st.name}`;
     li.innerHTML=`
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="hist-time">${formatTime(entry.ts)}</span>
@@ -386,9 +389,9 @@ function fallbackRenderPatternHistoryMenu(){
     li.addEventListener('click',()=>{
       pointHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
-      const clone={...st};
+      const clone = {...st};
       clone.showPattern = isShown(clinicalResultEl);
-      clone.showPoint = true;
+      clone.showPoint   = true;
       applyState(clone);
     });
     pointHistoryMenuList.appendChild(li);
@@ -398,24 +401,15 @@ function fallbackRenderPointHistoryMenu(){
   pointHistoryMenuList.innerHTML = pointHistory.length
     ? pointHistory.slice().reverse().map(h=>{
         const st=h.ref||{};
-        const label= st && st.type==='unknownPoint'?`未登録: ${st.name}`:`経穴: ${st?.name||'(不明)'}`;
+        const label= st && st.type==='unknownPoint' ? `未登録: ${st.name}` : `経穴: ${st?.name||'(不明)'}`;
         return `<li><div style="display:flex;align-items:center;gap:6px;">
           <span class="hist-time">${formatTime(h.ts)}</span></div>
           <div class="hist-label">${escapeHTML(label)}</div></li>`;
       }).join('')
     : '<li>履歴なし</li>';
 }
-function fallbackRenderPatternHistoryMenu(){
-  patternHistoryMenuList.innerHTML = patternHistory.length
-    ? patternHistory.slice().reverse().map(h=>{
-        const st=h.ref||{};
-        const label=`病証: ${st?.cat||'?'} / ${st?.pattern||'?'}`;
-        return `<li><div style="display:flex;align-items:center;gap:6px;">
-          <span class="hist-time">${formatTime(h.ts)}</span></div>
-          <div class="hist-label">${escapeHTML(label)}</div></li>`;
-      }).join('')
-    : '<li>履歴なし</li>';
-}
+
+/* Guard */
 function guardRender(renderFn,fallbackFn,kind){
   try{
     if(typeof renderFn!=='function' || !/innerHTML/.test(renderFn.toString())){
@@ -719,7 +713,7 @@ function parseInterleavedRow(after, patternNames){
   return results;
 }
 
-/* 重要: バグ修正済パターン見出し読込 */
+/* パターン見出し行読込 (バグ修正済) */
 function parseClinicalCSV(raw){
   const logical=rebuildLogicalRows(raw);
   const table=logical.map(parseCSVLogicalRow);
@@ -739,10 +733,9 @@ function parseClinicalCSV(raw){
       if(i>=table.length) break;
       if(!isPatternHeaderRow(table[i])) continue;
 
-      // 病証見出し行
       const pRow = table[i];
       const patternNames = [];
-      for(let col=1; col<pRow.length; col++){              // ← 修正: 以前は c=pRow[c] のタイポ
+      for(let col=1; col<pRow.length; col++){
         const name = trimOuter(pRow[col]);
         if(!name) continue;
         patternNames.push(name);
@@ -762,29 +755,29 @@ function parseClinicalCSV(raw){
         const after=r.slice(1);
         const inter = isInterleavedTreatmentRow(after, patternNames.length);
         if(inter){
-            const groups=parseInterleavedRow(after, patternNames);
-            groups.forEach(g=>{
-              data.cats[category].patterns[g.pattern].push({
-                label:g.label, rawPoints:g.rawPoints, comment:g.comment
-              });
+          const groups=parseInterleavedRow(after, patternNames);
+          groups.forEach(g=>{
+            data.cats[category].patterns[g.pattern].push({
+              label:g.label, rawPoints:g.rawPoints, comment:g.comment
             });
-            i++;
+          });
+          i++;
         }else{
           const next=table[i+1]||[];
           const commentRow=isPotentialCommentRow(next)? next:null;
-          patternNames.forEach((pName,idx)=>{
-            const col=idx+1;
-            const cell=r[col]||'';
-            if(!cell) return;
-            const {label,rawPoints,comment}=dissectTreatmentCell(cell);
-            if(!label && !rawPoints) return;
-            let finalComment=comment;
-            if(!finalComment && commentRow){
-              const cc=commentRow[col]||'';
-              if(/^[（(]/.test(cc)) finalComment=cc;
-            }
-            data.cats[category].patterns[pName].push({label,rawPoints,comment:finalComment});
-          });
+            patternNames.forEach((pName,idx)=>{
+              const col=idx+1;
+              const cell=r[col]||'';
+              if(!cell) return;
+              const {label,rawPoints,comment}=dissectTreatmentCell(cell);
+              if(!label && !rawPoints) return;
+              let finalComment=comment;
+              if(!finalComment && commentRow){
+                const cc=commentRow[col]||'';
+                if(/^[（(]/.test(cc)) finalComment=cc;
+              }
+              data.cats[category].patterns[pName].push({label,rawPoints,comment:finalComment});
+            });
           i+= commentRow?2:1;
         }
       }
@@ -793,7 +786,6 @@ function parseClinicalCSV(raw){
     i++;
   }
 
-  // トークン計算
   data.order.forEach(cat=>{
     const catObj=data.cats[cat];
     catObj.patternOrder.forEach(pn=>{
@@ -802,7 +794,6 @@ function parseClinicalCSV(raw){
       });
     });
   });
-
   return data;
 }
 
@@ -976,9 +967,9 @@ function linkifyRegionAcupoints(html){
           a.href='#';
           a.className='treat-point-link';
           const p=findAcupointByToken(matched);
-            if(p && p.important) a.classList.add('acu-important');
+          if(p && p.important) a.classList.add('acu-important');
           a.dataset.point=matched;
-          a.textContent=matched;
+            a.textContent=matched;
           frag.appendChild(a);
           i+=len; cursor=i;
         }else i++;
@@ -1292,7 +1283,6 @@ function init(){
     requestAnimationFrame(equalizeTopCards);
     requestAnimationFrame(()=>{ inputEl.focus(); inputEl.select(); });
 
-    // 初回 state セット
     const waitReady=setInterval(()=>{
       if((DATA_READY||CLINICAL_READY) && historyStack.length===0){
         pushState({type:'home'});
@@ -1311,4 +1301,4 @@ function init(){
 window.addEventListener('resize',equalizeTopCards);
 init();
 
-/* NOTE: [[ ]] MutationObserver fallback 不要 (showPointDetail で確定生成) */
+/* NOTE: [[ ]] MutationObserver fallback 不要 */
