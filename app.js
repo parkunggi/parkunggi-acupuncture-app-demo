@@ -337,35 +337,41 @@ function renderPatternHistoryMenu(){
     const li=document.createElement('li'); li.textContent='履歴なし';
     patternHistoryMenuList.appendChild(li); return;
   }
-  const current=historyStack[historyIndex];
+  const current = historyStack[historyIndex];
   arr.forEach(entry=>{
     const st=entry.ref;
     const li=document.createElement('li');
     if(st===current) li.classList.add('active');
-    const label=`病証: ${st.cat}/${transformPatternDisplay(st.pattern)}`;
+    const label = transformPatternDisplay(st.pattern); // カテゴリ名削除
     li.innerHTML=`
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="hist-time">${formatTime(entry.ts)}</span>
       </div>
       <div class="hist-label">${escapeHTML(label)}</div>`;
-    li.addEventListener('click',()=>{
+    li.addEventListener('click', ()=>{
       patternHistoryMenu.classList.add('hidden');
       historyIndex = entry.idx;
-      const clone={...st};
-      clone.showPoint = isShown(inlineAcupointResult);
+      const clone = {...st};
+      const pointShown = isShown(inlineAcupointResult);
+      clone.showPoint = pointShown;
       clone.showPattern = true;
       applyState(clone);
     });
     patternHistoryMenuList.appendChild(li);
   });
 }
-function renderPointHistoryMenu(){
-  pointHistoryMenuList.innerHTML='';
-  const arr=[...pointHistory].reverse();
-  if(!arr.length){
-    const li=document.createElement('li'); li.textContent='履歴なし';
-    pointHistoryMenuList.appendChild(li); return;
-  }
+
+function fallbackRenderPatternHistoryMenu(){
+  patternHistoryMenuList.innerHTML = patternHistory.length
+    ? patternHistory.slice().reverse().map(h=>{
+        const st=h.ref||{};
+        const label = transformPatternDisplay(st?.pattern||'?'); // カテゴリ名削除
+        return `<li><div style="display:flex;align-items:center;gap:6px;">
+          <span class="hist-time">${formatTime(h.ts)}</span></div>
+          <div class="hist-label">${escapeHTML(label)}</div></li>`;
+      }).join('')
+    : '<li>履歴なし</li>';
+}
   const current=historyStack[historyIndex];
   arr.forEach(entry=>{
     const st=entry.ref;
