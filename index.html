@@ -129,10 +129,14 @@
   #acupoint-suggestion-list li .sug-badges { display:flex; gap:4px; align-items:center; }
   #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; line-height:1; border-radius:var(--badge-radius); font-weight:600; letter-spacing:.5px; }
   .badge-important { background:#ffe0dc; color:#c40000; }
-  .badge-muscle { background:#e9f8ef; color:#1d7f34; }
-  #acupoint-suggestion-list li.active, #acupoint-suggestion-list li:hover {
+  #acupoint-suggestion-list li.active,
+  #acupoint-suggestion-list li:hover {
     background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
   }
+  #acupoint-suggestion-list li.active .sug-name,
+  #acupoint-suggestion-list li:hover .sug-name { color:var(--suggestion-active-fg); }
+  #acupoint-suggestion-list li.active .sug-name.important,
+  #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
@@ -145,6 +149,10 @@
   }
   .treat-point-link.acu-important {
     color:var(--important-red); font-weight:700; border-bottom:1px solid var(--important-red);
+  }
+  .treat-point-link.acu-important:hover {
+    color:#ff2a2a; border-color:#ff2a2a;
+    background:linear-gradient(90deg,rgba(196,0,0,.08),rgba(196,0,0,.03));
   }
 
   .pattern-name-highlight { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
@@ -179,7 +187,6 @@
     }
   }
 
-  /* 履歴件数バッジ */
   #point-history-btn[data-count]:after,
   #pattern-history-btn[data-count]:after {
     content: attr(data-count);
@@ -207,14 +214,12 @@
     #inline-acupoint-result { position:static; max-height:none; overflow:visible; }
   }
 
-  /* [[ ]] 赤字強調 */
   #result-region .bui-red,
   #result-region .bui-red * {
     color:#d60000 !important;
     font-weight:600;
   }
 
-  /* Home ギャラリー */
   .home-gallery-section {
     margin:28px 0 0;
     background:#fff;
@@ -224,7 +229,6 @@
     box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
   }
 
-  /* 系統が自動 "-" の場合 */
   select.is-system-disabled {
     background:#f0f0f0;
     color:#888;
@@ -290,7 +294,7 @@
         </div>
         <div style="margin-bottom:6px;">
           <label for="system-select" style="display:block;font-size:.7rem;margin:0 0 3px;">系統</label>
-            <select id="system-select" disabled><option value="">--</option></select>
+          <select id="system-select" disabled><option value="">--</option></select>
         </div>
         <div style="margin-bottom:6px;">
           <label for="symptom-select" style="display:block;font-size:.7rem;margin:0 0 3px;">症状</label>
@@ -348,6 +352,6 @@
 
 <script src="readings.js?v=20250922-navlink"></script>
 <script src="muscle-map.js?v=20250922-navlink"></script>
-<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY-HIERARCHY-ROBUST"></script>
+<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-HIERARCHY-ROBUST-RELATE-NAVFIX"></script>
 </body>
 </html>
