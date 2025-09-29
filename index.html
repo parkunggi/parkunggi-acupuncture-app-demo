@@ -23,8 +23,7 @@
     padding-top:58px;
   }
   header {
-    padding:6px 12px; background:#0d6efd; color:#fff;
-    display:flex; align-items:center; gap:8px;
+    padding:6px 12px; background:#0d6efd; color:#fff; display:flex; align-items:center; gap:8px;
     position:fixed; top:0; left:0; right:0; z-index:1000;
   }
   header h1 { margin:0 4px 0 0; font-size:1.05rem; font-weight:600; letter-spacing:.03em; line-height:1.2; flex:1 1 auto; }
@@ -40,7 +39,7 @@
   .nav-btn:hover:not([disabled]) { background:var(--home-hover-bg); border-color:#fff; }
   .nav-btn:active:not([disabled]) { transform:scale(.95); }
   .nav-btn:focus-visible { outline:2px solid #fff; outline-offset:2px; }
-  .nav-btn[disabled] { opacity:.35; cursor:not-allowed; }
+  .nav-btn[disabled] { opacity:.4; cursor:not-allowed; }
   .nav-btn svg { width:18px; height:18px; fill:currentColor; }
 
   .history-menu {
@@ -58,21 +57,19 @@
   .history-menu li:last-child { border-bottom:none; }
   .history-menu li:hover { background:#eef5ff; }
   .history-menu li.active { background:#d9ecff; font-weight:600; }
-  .hist-time { font-size:10px; color:#666; margin-left:auto; }
   .hist-label { font-size:11px; }
+  .hist-time { font-size:10px; color:#666; margin-left:auto; }
 
   main { padding:12px 16px 48px; }
   #main-screen { display:grid; grid-template-columns:minmax(0,1fr) var(--right-col-width); gap:var(--gap); align-items:start; }
-  .left-inner {
-    display:grid; gap:var(--gap); grid-template-columns:1fr 1fr;
+  .left-inner { display:grid; gap:var(--gap); grid-template-columns:1fr 1fr;
     grid-template-areas:
       "search symptoms"
       "treatment treatment"
       "meridian meridian";
     align-items:start;
   }
-  .search-container{grid-area:search;}
-  .selection-container{grid-area:symptoms;}
+  .search-container{grid-area:search;} .selection-container{grid-area:symptoms;}
   .clinical-result{grid-area:treatment;}
   .meridian-image-section{grid-area:meridian;}
 
@@ -84,21 +81,23 @@
   }
 
   #inline-acupoint-result {
-    position:static; max-height:none; overflow:visible;
+    position:static; top:auto; max-height:none; overflow:visible;
     display:flex; flex-direction:column; gap:10px;
   }
 
   .info-container h3 { font-size:.7rem; margin:10px 0 3px; letter-spacing:.05em; color:#555; }
   .info-container p, .info-container ul { margin:0; font-size:.75rem; line-height:1.3; padding:0; list-style:disc inside; }
   #related-symptoms { list-style:none; padding-left:0; margin:0; }
-  #related-symptoms li { margin:0 0 3px; }
+  .info-container ul li { margin:0 0 3px; }
+
+  .acu-important-flag {
+    display:inline-block; background:#fff7b0;
+    color:var(--important-red);
+    padding:2px 8px 2px; font-size:.68rem; border-radius:999px; font-weight:700; letter-spacing:.5px;
+  }
 
   #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
   #result-name.is-important { color:var(--important-red); }
-  .acu-important-flag {
-    display:inline-block; background:#fff7b0; color:var(--important-red);
-    padding:2px 8px 2px; font-size:.68rem; border-radius:999px; font-weight:700; letter-spacing:.5px;
-  }
 
   #acupoint-search-input {
     width:100%; padding:7px 9px; font-size:.9rem; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
@@ -106,49 +105,55 @@
   #acupoint-search-input:focus { outline:2px solid #0d6efd55; border-color:#0d6efd; }
 
   #search-btn {
-    margin-top:8px; padding:6px 14px; font-size:.8rem;
-    border:1px solid #0d6efd; background:#0d6efd; color:#fff;
+    margin-top:8px; padding:6px 14px; font-size:.8rem; border:1px solid #0d6efd; background:#0d6efd; color:#fff;
     border-radius:20px; cursor:pointer;
   }
   #search-btn:hover { background:#0b5ed7; }
 
   .suggestion-wrapper { position:relative; }
   #acupoint-suggestion-list {
-    margin:6px 0 0; padding:0; list-style:none;
-    border:1px solid #c3ccd4; border-radius:6px; background:#fff;
-    max-height:260px; overflow:auto; font-size:.8rem;
-    box-shadow:0 4px 10px rgba(0,0,0,.08);
+    margin:6px 0 0; padding:0; list-style:none; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
+    max-height:260px; overflow:auto; font-size:.8rem; box-shadow:0 4px 10px rgba(0,0,0,.08);
   }
   #acupoint-suggestion-list.hidden { display:none; }
   #acupoint-suggestion-list li {
     display:grid; grid-template-columns:auto 10px 1fr auto; align-items:baseline; column-gap:8px;
-    padding:6px 10px 5px; line-height:1.25; cursor:pointer;
+    padding:6px 10px 5px; line-height:1.25; cursor:pointer; position:relative; font-variant-east-asian:full-width;
   }
   #acupoint-suggestion-list li:not(:last-child){ border-bottom:1px solid #eef1f4; }
   #acupoint-suggestion-list li .sug-name { font-weight:600; color:#222; white-space:nowrap; }
   #acupoint-suggestion-list li .sug-name.important { color:var(--important-red); }
-  #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; }
-  #acupoint-suggestion-list li .sug-reading { color:#555; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; font-weight:400; }
+  #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #acupoint-suggestion-list li mark { background:#fff4c2; color:#222; padding:0 2px; border-radius:3px; }
-  #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; border-radius:10px; }
+  #acupoint-suggestion-list li .sug-badges { display:flex; gap:4px; align-items:center; }
+  #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; line-height:1; border-radius:var(--badge-radius); font-weight:600; letter-spacing:.5px; }
   .badge-important { background:#ffe0dc; color:#c40000; }
+  .badge-muscle { background:#e9f8ef; color:#1d7f34; }
   #acupoint-suggestion-list li.active, #acupoint-suggestion-list li:hover {
     background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
   }
+  #acupoint-suggestion-list li.active .sug-name,
+  #acupoint-suggestion-list li:hover .sug-name { color:var(--suggestion-active-fg); }
   #acupoint-suggestion-list li.active .sug-name.important,
   #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
+  #acupoint-suggestion-list li.active .sug-reading,
+  #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
+  #acupoint-suggestion-list li.active mark,
+  #acupoint-suggestion-list li:hover mark { background:#084c9d; color:#fff; }
+  #acupoint-suggestion-list li.active .badge-important,
+  #acupoint-suggestion-list li:hover .badge-important { background:#ffb6aa; color:#6b0000; }
+  #acupoint-suggestion-list li.active .badge-muscle,
+  #acupoint-suggestion-list li:hover .badge-muscle { background:#a9e6bd; color:#063d18; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
   .treat-main a, .acu-pattern-link, .treat-point-link {
-    font-size:.74rem; text-decoration:none;
-    color:var(--brand-blue); font-weight:600;
-    border-bottom:1px solid rgba(11,77,156,.35); padding:0 1px;
-    transition:color .15s, border-color .15s, background-color .15s;
+    font-size:.74rem; text-decoration:none; color:var(--brand-blue); font-weight:600;
+    border-bottom:1px solid rgba(11,77,156,.35); padding:0 1px; transition:color .15s, border-color .15s, background-color .15s;
   }
   .treat-main a:hover, .acu-pattern-link:hover, .treat-point-link:hover {
-    color:var(--brand-blue-dark); border-color:var(--brand-blue-dark);
-    background:rgba(11,77,156,.08); border-radius:3px;
+    color:var(--brand-blue-dark); border-color:var(--brand-blue-dark); background:rgba(11,77,156,.08); border-radius:3px;
   }
   .treat-point-link.acu-important {
     color:var(--important-red); font-weight:700; border-bottom:1px solid var(--important-red);
@@ -157,6 +162,7 @@
     color:#ff2a2a; border-color:#ff2a2a;
     background:linear-gradient(90deg,rgba(196,0,0,.08),rgba(196,0,0,.03));
   }
+
   .pattern-name-highlight { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
 
   .treat-line { margin:0 0 8px; }
@@ -165,37 +171,63 @@
   .hidden { display:none !important; }
 
   .meridian-image-section {
-    background:#fff; border:1px solid #d4dae0;
-    border-radius:8px; padding:0; overflow:hidden;
+    background:var(--box-bg);
+    border:1px solid var(--box-border);
+    border-radius:var(--radius);
+    padding:0;
+    overflow:hidden;
   }
-  .meridian-image-section img { width:100%; height:auto; display:block; }
+  .meridian-image-wrapper { width:100%; height:100%; background:#fff; }
+  .meridian-image-wrapper img { width:100%; height:auto; display:block; }
 
   #status-float {
-    position:fixed; right:10px; bottom:10px;
-    background:rgba(0,0,0,.55); color:#fff;
-    font-size:10px; padding:7px 10px 6px;
-    border-radius:8px; backdrop-filter:blur(4px);
+    position:fixed; right:10px; bottom:10px; background:rgba(0,0,0,.55); color:#fff;
+    font-size:10px; padding:7px 10px 6px; border-radius:8px; backdrop-filter:blur(4px);
     z-index:999; line-height:1.2; max-width:230px;
   }
+  #status-float span { display:block; margin:0 0 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #status-float span:last-child { margin-bottom:0; }
 
   @media (min-width:861px){
     #inline-acupoint-result {
-      position:sticky; top:66px;
+      position:sticky;
+      top:66px;
       max-height:calc(100vh - 80px);
-      overflow:auto; scrollbar-width:thin;
+      overflow:auto;
+      scrollbar-width:thin;
+    }
+    #inline-acupoint-result::-webkit-scrollbar{ width:8px; }
+    #inline-acupoint-result::-webkit-scrollbar-track{
+      background:#eef2f5;
+      border-radius:4px;
+    }
+    #inline-acupoint-result::-webkit-scrollbar-thumb{
+      background:#9bbce4;
+      border-radius:4px;
+    }
+    #inline-acupoint-result::-webkit-scrollbar-thumb:hover{
+      background:#0d6efd;
     }
   }
 
+  /* 履歴件数バッジ */
+  #point-history-btn-wrapper, #pattern-history-btn-wrapper { position:relative; }
   #point-history-btn[data-count]:after,
   #pattern-history-btn[data-count]:after {
-    content:attr(data-count);
-    position:absolute; top:-4px; right:-4px;
-    background:#ff4d4f; color:#fff; font-size:10px;
-    line-height:1; padding:2px 5px; border-radius:12px;
-    font-weight:600; box-shadow:0 0 0 2px #0d6efd;
+    content: attr(data-count);
+    position:absolute;
+    top:-4px; right:-4px;
+    background:#ff4d4f;
+    color:#fff;
+    font-size:10px;
+    line-height:1;
+    padding:2px 5px;
+    border-radius:12px;
+    font-weight:600;
+    box-shadow:0 0 0 2px #0d6efd;
   }
 
-  @media (max-width:860px){
+  @media (max-width:860px) {
     #main-screen { grid-template-columns:1fr; }
     .left-inner { grid-template-columns:1fr;
       grid-template-areas:
@@ -205,22 +237,59 @@
         "meridian";
     }
     #inline-acupoint-result { position:static; max-height:none; overflow:visible; }
+    #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
   }
 
+  /* [[ ]] 赤字強調 */
   #result-region .bui-red,
-  #result-region .bui-red * { color:#d60000 !important; font-weight:600; }
+  #result-region .bui-red * {
+    color:#d60000 !important;
+    font-weight:600;
+  }
 
+  /* Home ギャラリー */
   .home-gallery-section {
-    margin:28px 0 0; background:#fff;
-    border:1px solid #d4dae0; border-radius:10px;
+    margin:28px 0 0;
+    background:#fff;
+    border:1px solid #d4dae0;
+    border-radius:10px;
     padding:14px 16px 18px;
     box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
   }
-
-  select.is-system-disabled {
-    background:#f0f0f0; color:#888; cursor:not-allowed;
+  .home-gallery-inner { display:flex; flex-direction:column; gap:10px; }
+  .home-gallery-header {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    font-size:.8rem; font-weight:600; color:#0b4d9c;
   }
-  select.is-system-disabled option { color:#888; }
+  #home-gallery-select {
+    padding:4px 8px; font-size:.8rem; border:1px solid #b9c3cc; border-radius:6px; background:#fff;
+  }
+  #home-gallery-select:focus { outline:2px solid #0d6efd55; border-color:#0d6efd; }
+  .home-gallery-image-wrapper {
+    position:relative;
+    background:#f2f5f8;
+    border:1px solid #d0d7dd;
+    border-radius:8px;
+    padding:6px;
+    text-align:center;
+    min-height:160px;
+  }
+  .home-gallery-image-wrapper img {
+    max-width:100%;
+    height:auto;
+    display:block;
+    margin:0 auto;
+    border-radius:4px;
+  }
+  .home-gallery-fallback {
+    font-size:.7rem;
+    color:#c00;
+    padding:18px 4px;
+  }
+  @media (max-width:640px){
+    .home-gallery-header { font-size:.75rem; }
+    #home-gallery-select { font-size:.75rem; }
+  }
 </style>
 </head>
 <body>
@@ -230,7 +299,7 @@
       <svg viewBox="0 0 24 24"><path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11l4.3 4.3a1 1 0 0 1-1.42 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.42 0z"/></svg>
     </button>
     <button id="home-btn" class="nav-btn" type="button" aria-label="ホーム" title="ホーム">
-      <svg viewBox="0 0 24 24"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
     </button>
     <button id="forward-btn" class="nav-btn" type="button" aria-label="進む" title="進む (Alt+→)">
       <svg viewBox="0 0 24 24"><path d="M9.3 18.7a1 1 0 0 1 0-1.4l4.3-4.3-4.3-4.3A1 1 0 0 1 10.7 7l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4 0z"/></svg>
@@ -239,19 +308,19 @@
   <h1>パクの経穴検索エンジン ver_240921</h1>
 
   <div id="pattern-history-btn-wrapper">
-    <button id="pattern-history-btn" class="nav-btn" type="button" aria-label="治療方針履歴" title="治療方針 履歴">
+    <button id="pattern-history-btn" class="nav-btn" type="button" aria-label="治療方針履歴" title="治療方針 履歴 (Pattern)">
       <svg viewBox="0 0 24 24"><text x="6" y="17" font-size="14" font-weight="700">P</text></svg>
     </button>
-    <div id="pattern-history-menu" class="history-menu hidden" role="listbox">
+    <div id="pattern-history-menu" class="history-menu hidden" role="listbox" aria-label="治療方針履歴メニュー">
       <ul id="pattern-history-menu-list"></ul>
     </div>
   </div>
 
   <div id="point-history-btn-wrapper">
-    <button id="point-history-btn" class="nav-btn" type="button" aria-label="経穴履歴" title="経穴 履歴">
+    <button id="point-history-btn" class="nav-btn" type="button" aria-label="経穴履歴" title="経穴 履歴 (Acupoint)">
       <svg viewBox="0 0 24 24"><text x="6" y="17" font-size="14" font-weight="700">A</text></svg>
     </button>
-    <div id="point-history-menu" class="history-menu hidden" role="listbox">
+    <div id="point-history-menu" class="history-menu hidden" role="listbox" aria-label="経穴履歴メニュー">
       <ul id="point-history-menu-list"></ul>
     </div>
   </div>
@@ -259,14 +328,13 @@
 <main>
   <section id="main-screen">
     <div class="left-inner">
-
       <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
         <input id="acupoint-search-input" type="text"
-          placeholder="経穴名(漢字/ひらがな)/筋肉名"
-          autocomplete="off" aria-autocomplete="list"
-          aria-haspopup="listbox" aria-expanded="false"
-          aria-owns="acupoint-suggestion-list">
+               placeholder="経穴名(漢字/ひらがな)/筋肉名"
+               autocomplete="off" aria-autocomplete="list"
+               aria-haspopup="listbox" aria-expanded="false"
+               aria-owns="acupoint-suggestion-list">
         <div class="suggestion-wrapper">
           <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
         </div>
@@ -276,16 +344,8 @@
       <div id="symptom-card" class="selection-container">
         <h2>症状・病証</h2>
         <div style="margin-bottom:6px;">
-          <label for="classification-select" style="display:block;font-size:.7rem;margin:0 0 3px;">分類</label>
-          <select id="classification-select" disabled><option value="">--</option></select>
-        </div>
-        <div style="margin-bottom:6px;">
-          <label for="system-select" style="display:block;font-size:.7rem;margin:0 0 3px;">系統</label>
-          <select id="system-select" disabled><option value="">--</option></select>
-        </div>
-        <div style="margin-bottom:6px;">
-          <label for="symptom-select" style="display:block;font-size:.7rem;margin:0 0 3px;">症状</label>
-          <select id="symptom-select" disabled><option value="">--</option></select>
+          <label for="clinical-category-select" style="display:block;font-size:.7rem;margin:0 0 3px;">カテゴリ</label>
+          <select id="clinical-category-select"><option value="">--</option></select>
         </div>
         <div>
           <label for="clinical-pattern-select" style="display:block;font-size:.7rem;margin:0 0 3px;">病証</label>
@@ -299,7 +359,9 @@
       </div>
 
       <div id="meridian-image-section" class="meridian-image-section hidden" aria-live="polite">
-        <img id="meridian-image" alt="" decoding="async">
+        <div class="meridian-image-wrapper">
+          <img id="meridian-image" alt="" decoding="async">
+        </div>
       </div>
     </div>
 
@@ -316,15 +378,17 @@
     </div>
   </section>
 
-  <!-- Home ギャラリー -->
-  <section id="home-gallery-section" class="home-gallery-section hidden" aria-label="全身経絡図">
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.8rem;font-weight:600;color:#0b4d9c;">
-      <label for="home-gallery-select">全身図:</label>
-      <select id="home-gallery-select"></select>
-    </div>
-    <div style="margin-top:8px; background:#f2f5f8; border:1px solid #d0d7dd; border-radius:8px; padding:6px; text-align:center; min-height:160px;">
-      <img id="home-gallery-image" alt="全身経絡図" decoding="async" loading="lazy" style="max-width:100%;height:auto;display:block;margin:0 auto;">
-      <div id="home-gallery-fallback" class="hidden" style="font-size:.7rem;color:#c00;padding:18px 4px;">画像を読み込めませんでした</div>
+  <!-- Home 用 全身図ギャラリー（Home 状態のみ表示） -->
+  <section id="home-gallery-section" class="home-gallery-section hidden" aria-label="経絡全身図選択">
+    <div class="home-gallery-inner">
+      <div class="home-gallery-header">
+        <label for="home-gallery-select">全身図:</label>
+        <select id="home-gallery-select" aria-controls="home-gallery-image"></select>
+      </div>
+      <div class="home-gallery-image-wrapper">
+        <img id="home-gallery-image" alt="全身経絡図" decoding="async" loading="lazy">
+        <div id="home-gallery-fallback" class="home-gallery-fallback hidden">画像を読み込めませんでした</div>
+      </div>
     </div>
   </section>
 
@@ -336,6 +400,6 @@
 
 <script src="readings.js?v=20250922-navlink"></script>
 <script src="muscle-map.js?v=20250922-navlink"></script>
-<script src="app.js?v=20250922-FINAL-STABLE-FULLFIX"></script>
+<script src="app.js?v=20250922-NAV-LINK-HOTFIX5-NERVE-VESSEL-REMOVED-IMGFIX14-HOMEGALLERY"></script>
 </body>
 </html>
