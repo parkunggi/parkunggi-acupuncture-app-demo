@@ -463,22 +463,22 @@ function parseAcuCSV(raw){
 const LEADING_SYMBOL_RE=/^[※＊*＋+･・.\-／/\\]+/;
 function parseTreatmentPoints(raw){
   if(!raw) return [];
-  const stripped=raw
-    .replace(/（[^）]*）/g,'')
-    .replace(/\([^)]*\)/g,'');
-  return stripped
+  return raw
+    .replace(/（[^）]*）/g,'') // 丸括弧内除去
+    .replace(/\([^)]*\)/g,'')  // 丸括弧内除去
     .replace(/\r?\n/g,'/')
     .replace(/[，、]/g,'/')
     .replace(/[＋+･・]/g,'/')
     .replace(/／/g,'/')
     .replace(/\/{2,}/g,'/')
     .split('/')
-    .map(t=>t.replace(LEADING_SYMBOL_RE,''))
-    .map(t=>removeAllUnicodeSpaces(t))
+    .map(t=>t.replace(LEADING_SYMBOL_RE,'')) // 先頭記号除去
     .map(t=>t.trim())
-    .filter(t=>t.length)
-    .map(t=>t.replace(/[。.,、，;；/]+$/,''))
     .filter(Boolean)
+    // 末尾に記号・句読点・スラッシュ残っていたら除去
+    .map(t=>t.replace(/[。.,、，;；/]+$/,''))
+    .filter(t=>t.length)
+    // 明らかな記号だけのものは除外
     .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));
 }
 function normalizeAcuLookupName(name){
