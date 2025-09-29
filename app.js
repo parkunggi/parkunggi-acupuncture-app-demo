@@ -1,9 +1,22 @@
 /********************************************************************
  * 経穴検索 + 臨床病証 + 4階層(分類/系統/症状/病証) + 治療方針表示
- * 重要穴赤表示 / 記号付き経穴トークン正規化 / 履歴ナビ / 画像 / Homeギャラリー
- * APP_VERSION: 20250929-NORMALIZE-FIX
+ * Robust Parser / CSV Normalization Hardened
+ * APP_VERSION: 20250929-ROBUST-NORMALIZE-R1
  ********************************************************************/
-const APP_VERSION='20250929-NORMALIZE-FIX';
+const APP_VERSION='20250929-ROBUST-NORMALIZE-R1';
+
+/* ---------- 設定/デバッグ ---------- */
+const DEBUG_CLINICAL_PARSE=true;        // 必要に応じ false
+const MAX_DEBUG_WARN=200;               // 警告スロットル
+let debugWarnCount=0;
+function dbgWarn(...a){
+  if(!DEBUG_CLINICAL_PARSE) return;
+  if(debugWarnCount<MAX_DEBUG_WARN){
+    console.warn('[CLINICAL_PARSE]',...a);
+    debugWarnCount++;
+    if(debugWarnCount===MAX_DEBUG_WARN) console.warn('[CLINICAL_PARSE] (以降抑制)');
+  }
+}
 
 /* ---------- 定数 / ファイル ---------- */
 const CSV_FILE='経穴・経絡.csv';
@@ -17,6 +30,58 @@ const EXPECTED_TOTAL=361;
 const READINGS=window.ACU_READINGS||{};
 const MUSCLE_MAP=window.ACU_MUSCLE_MAP||{};
 
+/* ---------- 正規化ユーティリティ ---------- */
+function normalizeNFC(s){ return s? s.normalize('NFC'):''; }
+function stripControlSpaces(str){
+  return normalizeNFC(str||'')
+    .replace(/[\u0000-\u001F\u007F]/g,'')
+    .replace(/[\u200B-\u200D\u2060]/g,'')      // ゼロ幅類
+    .replace(/\uFEFF/g,'')
+    .replace(/[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g,' ');
+}
+function normalizeKey(s){
+  return stripControlSpaces(s||'')
+    .replace(/[ \u00A0\u3000]+/g,'')           // すべての空白除去
+    .replace(/\r?\n/g,'')
+    .replace(/[\t]/g,'')
+    .trim();
+}
+function normalizeLooseCell(s){
+  // セル内部用: 改行→スペース、余計な多重空白→1
+  return stripControlSpaces(s||'')
+    .replace(/\r?\n+/g,' / ')
+    .replace(/ {2,}/g,' ')
+    .trim();
+}
+function trimOuter(s){ return (s||'').trim(); }
+function isHiraganaOnly(s){ return !!s && /^[\u3041-\u3096]+$/.test(s); }
+function isSpace(ch){ return /[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/.test(ch); }
+function escapeHTML(s){
+  return (s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function applyRedMarkup(text){
+  if(!text) return '';
+  if(text.includes('<span class="bui-red">')) return text;
+  return text.replace(/\[\[([^\[\]\r\n]{1,120})\]\]/g,'<span class="bui-red">$1</span>');
+}
+function ensureCommentParens(c){
+  if(!c) return '';
+  if(/^\s*[（(]/.test(c)) return c;
+  return '('+c+')';
+}
+function transformPatternDisplay(original){
+  const idx=original.indexOf('→');
+  if(idx===-1) return original;
+  const left=original.slice(0,idx).trim();
+  const right=original.slice(idx+1).trim();
+  if(/^【.+】$/.test(left)&&right&&!/^【.+】$/.test(right)){
+    return `${right}→${left}`;
+  }
+  return original;
+}
+function getDisplayPatternName(n){ return transformPatternDisplay(n); }
+function isShown(el){ return el && !el.classList.contains('hidden'); }
+
 /* ---------- 状態 ---------- */
 let ACUPOINTS=[];
 let ACUPOINT_NAME_LIST=[];
@@ -25,13 +90,13 @@ let ACUPOINT_NAME_SET=new Set();
 let DATA_READY=false;
 let CLINICAL_READY=false;
 
-let CLINICAL_DATA={ order:[], cats:{} };   // {order:[cat...], cats:{ cat:{patternOrder:[patternOrig...],patterns:{patternOrig:[group...]}}}}
-let clinicalHierarchy={};                 // {分類:{ systems:{ 系統:{ symptoms:{ 症状:{patterns:[patternOrig...],patternGroups:{patternOrig:groups}}}, order:[症状..]}}, order:[系統..]}}
-let ACUPOINT_PATTERN_INDEX={};            // { normalizedPointName: [ {cat, patternOriginal} , ... ] }
-
+let CLINICAL_DATA={ order:[], cats:{} };   // {order:[cat...], cats:{ cat:{patternOrder:[orig...],patterns:{orig:[group...]}}}}
+let clinicalHierarchy={};
+let ACUPOINT_PATTERN_INDEX={};            // { pointNorm: [ {cat,pattern,patternNorm} ] }
 let rawClinicalCSV='';
-let patternNameNormalizeMap=new Map();    // patternOrig -> patternNorm
-let patternNormToOriginals=new Map();     // patternNorm -> Set(patternOrig)
+
+let patternNameNormalizeMap=new Map();    // orig -> norm
+let patternNormToOriginals=new Map();     // norm -> Set(orig)
 
 /* 履歴 */
 let historyStack=[];
@@ -95,100 +160,7 @@ const HOME_GALLERY_IMAGES=[
 ];
 const HOME_GALLERY_LS_KEY='homeGallery.lastFile';
 
-/* ---------- Utility ---------- */
-function normalizeNFC(s){ return s? s.normalize('NFC'):''; }
-function removeAllUnicodeSpaces(str){
-  return normalizeNFC(str||'')
-    .replace(/[\u0000-\u001F\u007F]/g,'')
-    .replace(/[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g,'')
-    .replace(/\uFEFF/g,'');
-}
-function trimOuter(s){ return (s||'').trim(); }
-function isHiraganaOnly(s){ return !!s && /^[\u3041-\u3096]+$/.test(s); }
-function isSpace(ch){ return /[ \u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/.test(ch); }
-function escapeHTML(s){
-  return (s||'').replace(/[&<>"']/g,c=>{
-    switch(c){
-      case '&':return'&amp;'; case '<':return'&lt;'; case '>':return'&gt;';
-      case '"':return'&quot;'; case "'":return'&#39;';
-    }
-  });
-}
-function applyRedMarkup(text){
-  if(!text) return '';
-  if(text.includes('<span class="bui-red">')) return text;
-  return text.replace(/\[\[([^\[\]\r\n]{1,120})\]\]/g,'<span class="bui-red">$1</span>');
-}
-function ensureCommentParens(c){
-  if(!c) return '';
-  if(/^\s*[（(]/.test(c)) return c;
-  return '('+c+')';
-}
-function transformPatternDisplay(original){
-  const idx=original.indexOf('→');
-  if(idx===-1) return original;
-  const left=original.slice(0,idx).trim();
-  const right=original.slice(idx+1).trim();
-  if(/^【.+】$/.test(left)&&right&&!/^【.+】$/.test(right)){
-    return `${right}→${left}`;
-  }
-  return original;
-}
-function getDisplayPatternName(n){ return transformPatternDisplay(n); }
-function isShown(el){ return el && !el.classList.contains('hidden'); }
-
-/* 正規化キー (パターン名・経穴名トークン用) */
-function normalizeKey(s){
-  return (s||'')
-    .replace(/\uFEFF/g,'')
-    .replace(/\r?\n/g,'')
-    .replace(/[ \u00A0\u3000]+/g,'')   // 全角/半角スペース系除去
-    .trim();
-}
-
-/* ---------- Home ギャラリー ---------- */
-function initHomeGallery(){
-  if(!homeGallerySelect) return;
-  homeGallerySelect.innerHTML='';
-  let idx=0;
-  try{
-    const saved=localStorage.getItem(HOME_GALLERY_LS_KEY);
-    if(saved){
-      const p=HOME_GALLERY_IMAGES.findIndex(i=>i.file===saved);
-      if(p>=0) idx=p;
-    }
-  }catch(_){}
-  HOME_GALLERY_IMAGES.forEach((img,i)=>{
-    const opt=document.createElement('option');
-    opt.value=img.file; opt.textContent=img.label;
-    if(i===idx) opt.selected=true;
-    homeGallerySelect.appendChild(opt);
-  });
-  updateHomeGalleryImage(HOME_GALLERY_IMAGES[idx].file,false);
-}
-function updateHomeGalleryImage(file,store=true){
-  if(!homeGalleryImage) return;
-  const url='image/'+encodeURI(file)+'?v='+APP_VERSION;
-  homeGalleryFallback.classList.add('hidden');
-  homeGalleryImage.classList.remove('hidden');
-  homeGalleryImage.alt=file.replace(/\.(jpeg|jpg|png)$/i,'');
-  homeGalleryImage.onload=()=>{};
-  homeGalleryImage.onerror=()=>{
-    homeGalleryImage.classList.add('hidden');
-    homeGalleryFallback.classList.remove('hidden');
-  };
-  homeGalleryImage.src=url;
-  if(store){
-    try{ localStorage.setItem(HOME_GALLERY_LS_KEY,file);}catch(_){}
-  }
-}
-homeGallerySelect?.addEventListener('change',()=>{
-  if(homeGallerySelect.value) updateHomeGalleryImage(homeGallerySelect.value,true);
-});
-function showHomeGallery(){ homeGallerySection.classList.remove('hidden'); }
-function hideHomeGallery(){ homeGallerySection.classList.add('hidden'); }
-
-/* ---------- 履歴 ---------- */
+/* ---------- 履歴ユーティリティ（既存ロジックそのまま） ---------- */
 function statesEqual(a,b){
   if(!a||!b) return false;
   if(a.type!==b.type) return false;
@@ -218,16 +190,13 @@ function pushState(state,replace=false){
   const prev=historyStack[historyIndex]||null;
   state.showPoint= state.showPoint ?? isShown(inlineAcupointResult);
   state.showPattern= state.showPattern ?? isShown(clinicalResultEl);
-
   if(state.type==='home'){ state.showPoint=false; state.showPattern=false; }
   else if(state.type==='point'||state.type==='unknownPoint'){ state.showPoint=true; }
   else if(state.type==='pattern'){ state.showPattern=true; }
-
   if(prev){
     if(state.type==='pattern' && prev.showPoint) state.showPoint=true;
     if((state.type==='point'||state.type==='unknownPoint') && prev.showPattern) state.showPattern=true;
   }
-
   if(historyIndex>=0 && statesEqual(historyStack[historyIndex],state)){
     historyStack[historyIndex].showPoint=state.showPoint;
     historyStack[historyIndex].showPattern=state.showPattern;
@@ -260,166 +229,10 @@ function formatTime(ts){
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/* パターン適用（サイレント） */
-function applyPatternPathSilently(cf,sys,sym,pat){
-  if(!clinicalHierarchy[cf]) return;
-  classificationSelect.value=cf;
-  renderSystemOptions(cf);
-  if(systemSelect.disabled){
-    sys='-';
-  }else if(sys && systemSelect.querySelector(`option[value="${sys}"]`)){
-    systemSelect.value=sys;
-  }else{
-    sys = systemSelect.disabled? '-' : systemSelect.value;
-  }
-  if(sys){
-    renderSymptomOptions(cf,sys);
-    if(sym && symptomSelect.querySelector(`option[value="${sym}"]`)){
-      symptomSelect.value=sym;
-    }else sym='';
-  }
-  if(symptomSelect.value){
-    renderPatternOptions(cf,sys,symptomSelect.value);
-    if(pat && patternSelect.querySelector(`option[value="${pat}"]`)){
-      patternSelect.value=pat;
-    }
-  }
-  renderPatternDetail(cf,sys,symptomSelect.value,patternSelect.value,true);
-}
-
-/* applyState */
-function applyState(state){
-  if(!state) return;
-  IS_APPLYING_HISTORY=true;
-  try{
-    switch(state.type){
-      case 'home':
-        showHomeGallery();
-        resetHierarchySelects(false);
-        inlineAcupointResult.classList.add('hidden');
-        clinicalResultEl.classList.add('hidden');
-        clinicalGroupsEl.innerHTML='';
-        relatedSymptomsEl.innerHTML='<li>-</li>';
-        hideMeridianImage();
-        break;
-      case 'point':{
-        hideHomeGallery();
-        const p=ACUPOINTS.find(x=>x.name===state.name);
-        if(p) showPointDetail(p,true); else showUnknownPoint(state.name,true);
-        break;
-      }
-      case 'unknownPoint':
-        hideHomeGallery();
-        showUnknownPoint(state.name,true);
-        break;
-      case 'pattern':{
-        hideHomeGallery();
-        const parts=(state.path||'').split('||');
-        const [cf,sys,sym]=parts;
-        applyPatternPathSilently(cf,sys,sym,state.pattern);
-        break;
-      }
-    }
-    if(state.showPoint) inlineAcupointResult.classList.remove('hidden');
-    else inlineAcupointResult.classList.add('hidden');
-    if(state.showPattern) clinicalResultEl.classList.remove('hidden');
-    else clinicalResultEl.classList.add('hidden');
-  }finally{
-    IS_APPLYING_HISTORY=false;
-    updateNavButtons();
-    requestAnimationFrame(equalizeTopCards);
-  }
-}
-function goBack(){ if(historyIndex>0){ historyIndex--; applyState(historyStack[historyIndex]); } }
-function goForward(){ if(historyIndex < historyStack.length-1){ historyIndex++; applyState(historyStack[historyIndex]); } }
-
-/* 履歴メニュー */
-function renderPatternHistoryMenu(){
-  patternHistoryMenuList.innerHTML='';
-  const arr=[...patternHistory].reverse();
-  if(!arr.length){ patternHistoryMenuList.innerHTML='<li>履歴なし</li>'; return; }
-  const current=historyStack[historyIndex];
-  arr.forEach(h=>{
-    const st=h.ref;
-    const li=document.createElement('li');
-    if(st===current) li.classList.add('active');
-    li.innerHTML=`
-      <div style="display:flex;align-items:center;gap:6px;"><span class="hist-time">${formatTime(h.ts)}</span></div>
-      <div class="hist-label">${escapeHTML(transformPatternDisplay(st.pattern))}</div>`;
-    li.addEventListener('click',()=>{
-      patternHistoryMenu.classList.add('hidden');
-      historyIndex=h.idx;
-      const clone={...st};
-      clone.showPoint=isShown(inlineAcupointResult);
-      clone.showPattern=true;
-      applyState(clone);
-    });
-    patternHistoryMenuList.appendChild(li);
-  });
-}
-function renderPointHistoryMenu(){
-  pointHistoryMenuList.innerHTML='';
-  const arr=[...pointHistory].reverse();
-  if(!arr.length){ pointHistoryMenuList.innerHTML='<li>履歴なし</li>'; return; }
-  const current=historyStack[historyIndex];
-  arr.forEach(h=>{
-    const st=h.ref;
-    const li=document.createElement('li');
-    if(st===current) li.classList.add('active');
-    const label= st.type==='unknownPoint' ? `未登録: ${st.name}` : `経穴: ${st.name}`;
-    li.innerHTML=`
-      <div style="display:flex;align-items:center;gap:6px;"><span class="hist-time">${formatTime(h.ts)}</span></div>
-      <div class="hist-label">${escapeHTML(label)}</div>`;
-    li.addEventListener('click',()=>{
-      pointHistoryMenu.classList.add('hidden');
-      historyIndex=h.idx;
-      const clone={...st};
-      clone.showPattern=isShown(clinicalResultEl);
-      clone.showPoint=true;
-      applyState(clone);
-    });
-    pointHistoryMenuList.appendChild(li);
-  });
-}
-function safe(fn,fallback){
-  try{
-    fn();
-    const ul=(fn===renderPatternHistoryMenu)?patternHistoryMenuList:pointHistoryMenuList;
-    if(!ul.children.length) fallback();
-  }catch(e){ fallback(); }
-}
-const renderPatternHistoryMenuSafely=()=>safe(renderPatternHistoryMenu,()=>{patternHistoryMenuList.innerHTML='<li>履歴なし</li>';});
-const renderPointHistoryMenuSafely=()=>safe(renderPointHistoryMenu,()=>{pointHistoryMenuList.innerHTML='<li>履歴なし</li>';});
-
-patternHistoryBtn?.addEventListener('click',()=>{
-  pointHistoryMenu.classList.add('hidden');
-  patternHistoryMenu.classList.toggle('hidden');
-  if(!patternHistoryMenu.classList.contains('hidden')) renderPatternHistoryMenuSafely();
-});
-pointHistoryBtn?.addEventListener('click',()=>{
-  patternHistoryMenu.classList.add('hidden');
-  pointHistoryMenu.classList.toggle('hidden');
-  if(!pointHistoryMenu.classList.contains('hidden')) renderPointHistoryMenuSafely();
-});
-document.addEventListener('click',e=>{
-  if(!patternHistoryMenu.classList.contains('hidden') && !e.target.closest('#pattern-history-btn-wrapper')){
-    patternHistoryMenu.classList.add('hidden');
-  }
-  if(!pointHistoryMenu.classList.contains('hidden') && !e.target.closest('#point-history-btn-wrapper')){
-    pointHistoryMenu.classList.add('hidden');
-  }
-});
-window.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){
-    patternHistoryMenu.classList.add('hidden');
-    pointHistoryMenu.classList.add('hidden');
-  }
-});
-
 /* ---------- 経穴 CSV ---------- */
 function parseAcuCSV(raw){
   if(!raw) return [];
-  const text=raw.replace(/\r\n/g,'\n').replace(/\uFEFF/g,'');
+  const text=raw.replace(/\uFEFF/g,'').replace(/\r\n/g,'\n');
   const lines=text.split('\n').filter(l=>l.trim());
   function splitLine(line){
     if(!line.includes('"')) return line.split(',').map(c=>c.trim());
@@ -431,9 +244,8 @@ function parseAcuCSV(raw){
         else inQ=!inQ;
         continue;
       }
-      if(ch===',' && !inQ){
-        out.push(cur); cur='';
-      }else cur+=ch;
+      if(ch===',' && !inQ){ out.push(cur); cur=''; }
+      else cur+=ch;
     }
     out.push(cur);
     return out.map(c=>c.trim());
@@ -462,7 +274,7 @@ function parseAcuCSV(raw){
   return results;
 }
 
-/* ---------- 治療方針トークン抽出 (正規化対応) ---------- */
+/* ---------- 治療方針トークン抽出 ---------- */
 const LEADING_SYMBOL_RE=/^[※＊*＋+･・.\-／/\\]+/;
 function parseTreatmentPoints(raw){
   if(!raw) return [];
@@ -484,12 +296,11 @@ function parseTreatmentPoints(raw){
     .map(t=>normalizeKey(t));
 }
 function normalizeAcuLookupName(name){
-  return normalizeKey(removeAllUnicodeSpaces(name||''));
+  return normalizeKey(name);
 }
 function findAcupointByToken(token){
-  const key=normalizeAcuLookupName(token);
-  if(!key) return null;
-  return ACUPOINTS.find(p=>normalizeKey(p.name)===key);
+  const nk=normalizeAcuLookupName(token);
+  return ACUPOINTS.find(p=>normalizeKey(p.name)===nk)||null;
 }
 function buildNameLookup(){
   ACUPOINT_NAME_LIST=ACUPOINTS.map(p=>p.name).sort((a,b)=> b.length - a.length);
@@ -506,7 +317,7 @@ function matchTokenWithSpaces(raw,pos,token){
   return i-pos;
 }
 
-/* ---------- 括弧内リンク化補助 ---------- */
+/* ---------- 括弧内リンク化 ---------- */
 function linkifyParenthesisGroup(group){
   if(group.length<2) return escapeHTML(group);
   const open=group[0], close=group[group.length-1];
@@ -548,9 +359,7 @@ function buildPointsHTML(rawPoints,tokens){
       i=j; continue;
     }
     if(isSpace(ch)){ out+=escapeHTML(ch); i++; continue; }
-    if(/[※＊*＋+・･.\-]/.test(ch)){
-      out+=escapeHTML(ch); i++; continue;
-    }
+    if(/[※＊*＋+・･.\-]/.test(ch)){ out+=escapeHTML(ch); i++; continue; }
     let matched=null, consumed=0;
     for(const tk of sorted){
       const c=matchTokenWithSpaces(rawPoints,i,tk);
@@ -572,12 +381,14 @@ function buildPointsHTML(rawPoints,tokens){
   return out;
 }
 
-/* ---------- robust Clinical CSV Parser ---------- */
+/* ---------- Clinical CSV Robust Parser ---------- */
+/* 1) 物理行 -> 論理行（引用符内改行の連結） */
 function rebuildLogicalRows(raw){
-  const physical=raw.replace(/\r\n/g,'\n').split('\n');
+  const physical=raw.replace(/\uFEFF/g,'').replace(/\r\n/g,'\n').split('\n');
   const rows=[]; let buf=''; let quotes=0;
   for(const line of physical){
-    if(buf) buf+='\n'+line; else buf=line;
+    const ln=line.replace(/\uFEFF/g,'');
+    if(buf) buf+='\n'+ln; else buf=ln;
     quotes=(buf.match(/"/g)||[]).length;
     if(quotes%2===0){
       rows.push(buf); buf=''; quotes=0;
@@ -586,6 +397,7 @@ function rebuildLogicalRows(raw){
   if(buf) rows.push(buf);
   return rows;
 }
+/* 2) 1論理行をカラム分割（CSV 準拠） */
 function parseCSVLogicalRow(row){
   const cols=[]; let cur=''; let inQ=false;
   for(let i=0;i<row.length;i++){
@@ -599,39 +411,46 @@ function parseCSVLogicalRow(row){
     else cur+=ch;
   }
   cols.push(cur);
-  return cols.map(c=>c.replace(/\uFEFF/g,'').replace(/\u00A0/g,' ').trim());
+  return cols.map(c=>{
+    const v = c.replace(/\uFEFF/g,'');
+    return normalizeLooseCell(v);
+  });
 }
+/* 3) 行タイプ判定 */
 function isCategoryRow(cols){
   if(!cols.length) return false;
-  const c0=removeAllUnicodeSpaces(cols[0]);
-  return /^[0-9０-９][0-9０-９-]*\./.test(c0)&&cols.slice(1).every(c=>!c);
+  const c0=normalizeKey(cols[0]);
+  return /^[0-9０-９][0-9０-９.-]*\.$/.test(c0);
+}
+function findHeaderIndex(cols,keywordPattern){
+  for(let i=0;i<cols.length;i++){
+    const raw=cols[i];
+    if(!raw) continue;
+    const norm=normalizeKey(raw);
+    if(keywordPattern.test(norm)) return i;
+  }
+  return -1;
 }
 function isPatternHeaderRow(cols){
-  for(let i=0;i<Math.min(cols.length,6);i++){
-    const c=cols[i]; if(!c) continue;
-    if(/病証名/.test(c.replace(/\s+/g,''))) return true;
-  }
-  return false;
+  return findHeaderIndex(cols,/病証名/)>=0;
 }
 function isTreatmentRow(cols){
-  for(let i=0;i<Math.min(cols.length,6);i++){
-    const c=cols[i]; if(!c) continue;
-    if(/治療方針/.test(c.replace(/\s+/g,''))) return true;
-  }
-  return false;
+  return findHeaderIndex(cols,/治療方針/)>=0;
 }
 function isPotentialCommentRow(cols){
   if(!cols.length) return false;
   if(isCategoryRow(cols)||isPatternHeaderRow(cols)||isTreatmentRow(cols)) return false;
   return cols.some((c,i)=> i>0 && /^[（(]/.test(c||''));
 }
+
+/* 4) 個々治療セル分解 */
 function dissectTreatmentCell(cell){
   if(!cell) return {label:'',rawPoints:'',comment:''};
-  const lines=cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  const lines=cell.split(/[\/\n]+/).map(l=>l.trim()).filter(Boolean);
+  // コメント候補 (括弧開始)
   let comment='';
   if(lines.length && /^[（(]/.test(lines[lines.length-1])) comment=lines.pop();
   let main=lines.join(' ');
-  if(!main) main=cell;
   const tail=main.match(/([（(].*?[）)])\s*$/);
   if(tail){
     comment=comment||tail[1];
@@ -648,6 +467,8 @@ function dissectTreatmentCell(cell){
   }else label=main.trim();
   return {label,rawPoints,comment};
 }
+
+/* 5) インタリーブ（治療+コメントが交互で列ズレ）対応 */
 function isInterleavedTreatmentRow(after, patternCount){
   if(!after.length) return false;
   const treat=after.filter(c=>c && (c.includes('：')||c.includes(':')));
@@ -672,6 +493,8 @@ function parseInterleavedRow(after, patternNames){
   }
   return results;
 }
+
+/* 6) メインパース */
 function parseClinicalCSV(raw){
   patternNameNormalizeMap.clear();
   patternNormToOriginals.clear();
@@ -683,7 +506,7 @@ function parseClinicalCSV(raw){
     const row=table[i];
     if(!row.length){ i++; continue; }
     if(isCategoryRow(row)){
-      const category=removeAllUnicodeSpaces(row[0]);
+      const category=normalizeKey(row[0]); // 表示は元々の raw でも可
       if(!data.cats[category]){
         data.cats[category]={patternOrder:[],patterns:{}};
         data.order.push(category);
@@ -692,10 +515,10 @@ function parseClinicalCSV(raw){
       if(i>=table.length) break;
       if(!isPatternHeaderRow(table[i])) continue;
       const pRow=table[i];
-      let headerCol=pRow.findIndex(c=> c && /病証名/.test(c.replace(/\s+/g,'')));
-      if(headerCol<0){ i++; continue; }
+      const headerIdx=findHeaderIndex(pRow,/病証名/);
+      if(headerIdx<0){ i++; continue; }
       const patternNames=[];
-      for(let c=headerCol+1;c<pRow.length;c++){
+      for(let c=headerIdx+1;c<pRow.length;c++){
         const name=trimOuter(pRow[c]);
         if(name){
           patternNames.push(name);
@@ -704,31 +527,36 @@ function parseClinicalCSV(raw){
             data.cats[category].patternOrder.push(name);
           }
           const norm=normalizeKey(name);
-            patternNameNormalizeMap.set(name,norm);
-            if(!patternNormToOriginals.has(norm)) patternNormToOriginals.set(norm,new Set());
-            patternNormToOriginals.get(norm).add(name);
+          patternNameNormalizeMap.set(name,norm);
+          if(!patternNormToOriginals.has(norm)) patternNormToOriginals.set(norm,new Set());
+          patternNormToOriginals.get(norm).add(name);
         }
       }
       i++;
+      // 治療方針ブロック継続
       while(i<table.length){
         const r=table[i];
         if(isCategoryRow(r)) break;
         if(isPatternHeaderRow(r)){ i++; continue; }
-        if(!isTreatmentRow(r)){ i++; continue; }
-        const treatIdx=r.findIndex(c=> c && /治療方針/.test(c.replace(/\s+/g,'')));
+        if(!isTreatmentRow(r)){ 
+          // スキップしても良いが異常としてログ
+          if(r.some(c=>/治療方針|病証名/.test(c))) dbgWarn('疑似治療方針行だが検出失敗',r);
+          i++; continue; 
+        }
+        const treatIdx=findHeaderIndex(r,/治療方針/);
         if(treatIdx===-1){ i++; continue; }
         const after=r.slice(treatIdx+1);
         const inter=isInterleavedTreatmentRow(after,patternNames.length);
         if(inter){
           const groups=parseInterleavedRow(after,patternNames);
-          groups.forEach(g=>{
-            data.cats[category].patterns[g.pattern].push({
-              label:g.label,
-              rawPoints:g.rawPoints,
-              comment:g.comment,
-              tokens:parseTreatmentPoints(g.rawPoints)
+            groups.forEach(g=>{
+              data.cats[category].patterns[g.pattern].push({
+                label:g.label,
+                rawPoints:g.rawPoints,
+                comment:g.comment,
+                tokens:parseTreatmentPoints(g.rawPoints)
+              });
             });
-          });
           i++;
         }else{
           const next=table[i+1]||[];
@@ -761,7 +589,7 @@ function parseClinicalCSV(raw){
   return data;
 }
 
-/* ---------- 階層構築 ---------- */
+/* ---------- 階層構築（元ロジックを調整） ---------- */
 function buildClinicalHierarchyFromRaw(raw){
   const logical=rebuildLogicalRows(raw);
   const table=logical.map(parseCSVLogicalRow);
@@ -772,7 +600,7 @@ function buildClinicalHierarchyFromRaw(raw){
   for(const row of table){
     if(!row.length) continue;
     if(isCategoryRow(row)){
-      currentClassification=removeAllUnicodeSpaces(row[0]);
+      currentClassification=normalizeKey(row[0]);
       if(!clinicalHierarchy[currentClassification]){
         clinicalHierarchy[currentClassification]={systems:{},order:[]};
       }
@@ -781,7 +609,7 @@ function buildClinicalHierarchyFromRaw(raw){
     }
     if(!currentClassification) continue;
 
-    if(row[1] && !row[2]){
+    if(row[1] && !row[2]){ // 系統
       currentSystem=row[1];
       if(!clinicalHierarchy[currentClassification].systems[currentSystem]){
         clinicalHierarchy[currentClassification].systems[currentSystem]={symptoms:{},order:[]};
@@ -790,7 +618,7 @@ function buildClinicalHierarchyFromRaw(raw){
       currentSymptom=null;
       continue;
     }
-    if(row[2] && /^[0-9０-９]+\.?/.test(removeAllUnicodeSpaces(row[2]))){
+    if(row[2] && /^[0-9０-９]+\.?/.test(normalizeKey(row[2]))){ // 症状行
       currentSymptom=row[2];
       const sys=currentSystem && currentSystem.trim()? currentSystem:'-';
       if(!clinicalHierarchy[currentClassification].systems[sys]){
@@ -804,7 +632,7 @@ function buildClinicalHierarchyFromRaw(raw){
       }
       continue;
     }
-    if(row[2] && row[2].replace(/\s+/g,'').startsWith('病証名')){
+    if(row[2] && normalizeKey(row[2]).startsWith('病証名')){
       if(!currentClassification||!currentSymptom) continue;
       const sys=currentSystem && currentSystem.trim()? currentSystem:'-';
       const symNode=clinicalHierarchy[currentClassification].systems[sys]?.symptoms?.[currentSymptom];
@@ -828,7 +656,7 @@ function buildClinicalHierarchyFromRaw(raw){
   });
 }
 
-/* ---------- 逆インデックス (正規化対応) ---------- */
+/* ---------- 逆インデックス ---------- */
 function rebuildAcuPointPatternIndex(){
   ACUPOINT_PATTERN_INDEX={};
   CLINICAL_DATA.order.forEach(cat=>{
@@ -841,11 +669,11 @@ function rebuildAcuPointPatternIndex(){
       groups.forEach(g=>{
         const toks=g.tokens||[];
         toks.forEach(tk=>{
-          const tkNorm = normalizeKey(tk);
+          const tkNorm=normalizeKey(tk);
           if(!tkNorm || seen.has(tkNorm)) return;
           seen.add(tkNorm);
           if(!ACUPOINT_PATTERN_INDEX[tkNorm]) ACUPOINT_PATTERN_INDEX[tkNorm]=[];
-          ACUPOINT_PATTERN_INDEX[tkNorm].push({cat,pattern:pat,normPattern:normPat});
+          ACUPOINT_PATTERN_INDEX[tkNorm].push({cat,pattern:pat,patternNorm:normPat});
         });
       });
     });
@@ -860,7 +688,7 @@ function rebuildAcuPointPatternIndex(){
   });
 }
 
-/* ---------- レイアウト高さ ---------- */
+/* ---------- 表示系（既存 + 正規化対応少数） ---------- */
 function equalizeTopCards(){
   if(window.innerWidth<860){
     searchCard.style.height='';
@@ -874,9 +702,8 @@ function equalizeTopCards(){
   symptomCard.style.height=maxH+'px';
 }
 
-/* ---------- サジェスト ---------- */
 function filterPoints(qInput){
-  const q=removeAllUnicodeSpaces(qInput);
+  const q=normalizeKey(qInput);
   if(q.length<MIN_QUERY_LENGTH) return [];
   if(isHiraganaOnly(q)){
     let list=ACUPOINTS.filter(p=>p.reading && p.reading.startsWith(q));
@@ -885,7 +712,7 @@ function filterPoints(qInput){
   }
   const nm=[]; const seen=new Set();
   for(const p of ACUPOINTS){
-    if(p.name.includes(q)){ nm.push({...p,_matchType:'name'}); seen.add(p.name);}
+    if(normalizeKey(p.name).includes(q)){ nm.push({...p,_matchType:'name'}); seen.add(p.name);}
   }
   const mm=[];
   for(const p of ACUPOINTS){
@@ -913,10 +740,9 @@ function setActive(items,idx){
 }
 function renderSuggestions(list){
   suggestionListEl.innerHTML='';
-  const qRaw=removeAllUnicodeSpaces(inputEl.value);
+  const qRaw=normalizeKey(inputEl.value);
   const hira=isHiraganaOnly(qRaw)? qRaw:'';
   const qRegex=hira? new RegExp(hira.replace(/([.*+?^=!:${}()|[\\]\\])/g,'\\$1'),'g'):null;
-
   list.slice(0,120).forEach((p,i)=>{
     const li=document.createElement('li');
     li.dataset.id=p.name;
@@ -937,7 +763,6 @@ function renderSuggestions(list){
     li.addEventListener('click',()=>selectPoint(p));
     suggestionListEl.appendChild(li);
   });
-
   if(!list.length){
     const li=document.createElement('li');
     li.textContent='該当なし';
@@ -974,7 +799,7 @@ function handleSuggestionKeyboard(e){
   }
 }
 
-/* ---------- Region 内リンク化 ---------- */
+/* Region 内リンク化（既存） */
 function linkifyRegionAcupoints(html){
   if(!html||!ACUPOINT_NAME_LIST.length) return html;
   const wrapper=document.createElement('div');
@@ -993,14 +818,14 @@ function linkifyRegionAcupoints(html){
         }
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
-            const a=document.createElement('a');
-            a.href='#'; a.className='treat-point-link';
-            const p=findAcupointByToken(matched);
-            if(p && p.important) a.classList.add('acu-important');
-            a.dataset.point=matched;
-            a.textContent=matched;
-            frag.appendChild(a);
-            i+=len; cursor=i;
+          const a=document.createElement('a');
+          a.href='#'; a.className='treat-point-link';
+          const p=findAcupointByToken(matched);
+          if(p && p.important) a.classList.add('acu-important');
+          a.dataset.point=matched;
+          a.textContent=matched;
+          frag.appendChild(a);
+          i+=len; cursor=i;
         }else i++;
       }
       if(cursor<work.length) frag.appendChild(document.createTextNode(work.slice(cursor)));
@@ -1014,7 +839,7 @@ function linkifyRegionAcupoints(html){
   return wrapper.innerHTML;
 }
 
-/* ---------- 経絡画像 ---------- */
+/* 画像 */
 function hideMeridianImage(){
   meridianImageSection.classList.add('hidden');
   meridianImageEl.removeAttribute('src');
@@ -1029,7 +854,7 @@ function updateMeridianImage(meridian){
   meridianImageEl.src=url;
 }
 
-/* ---------- 経穴詳細表示 ---------- */
+/* 経穴詳細 */
 function showPointDetail(p, suppressHistory=false){
   hideHomeGallery();
   let regionHTML=p.region||'';
@@ -1057,7 +882,6 @@ function renderRelatedPatterns(pointName){
   relatedSymptomsEl.innerHTML='';
   const normPoint=normalizeKey(pointName);
   if(!ACUPOINT_PATTERN_INDEX[normPoint] && CLINICAL_READY){
-    // 念のため再構築 (一度だけ)
     rebuildAcuPointPatternIndex();
   }
   const arr=ACUPOINT_PATTERN_INDEX[normPoint];
@@ -1093,7 +917,7 @@ function selectPoint(p){
   showPointDetail(p);
 }
 
-/* ---------- 4段階セレクト ---------- */
+/* 4段階 select */
 function resetHierarchySelects(keepClassification=true){
   if(!keepClassification){
     classificationSelect.value='';
@@ -1108,7 +932,6 @@ function resetHierarchySelects(keepClassification=true){
   clinicalResultEl.classList.add('hidden');
   clinicalGroupsEl.innerHTML='';
 }
-
 function populateClassification(){
   classificationSelect.innerHTML='<option value="">--</option>';
   Object.keys(clinicalHierarchy).forEach(cf=>{
@@ -1118,7 +941,6 @@ function populateClassification(){
   });
   classificationSelect.disabled=false;
 }
-
 function renderSystemOptions(cf){
   systemSelect.innerHTML='';
   systemSelect.classList.remove('is-system-disabled');
@@ -1153,7 +975,6 @@ function renderSystemOptions(cf){
     systemSelect.appendChild(opt);
   });
 }
-
 function renderSymptomOptions(cf,sys){
   symptomSelect.innerHTML='';
   patternSelect.innerHTML='<option value="">--</option>'; patternSelect.disabled=true;
@@ -1173,7 +994,6 @@ function renderSymptomOptions(cf,sys){
   });
   symptomSelect.disabled=false;
 }
-
 function renderPatternOptions(cf,sys,sym){
   patternSelect.innerHTML='';
   const symNode=clinicalHierarchy[cf]?.systems?.[sys]?.symptoms?.[sym];
@@ -1190,7 +1010,6 @@ function renderPatternOptions(cf,sys,sym){
   });
   patternSelect.disabled=false;
 }
-
 function renderPatternDetail(cf,sys,sym,pat,fromHistory=false){
   clinicalGroupsEl.innerHTML='';
   clinicalResultEl.classList.add('hidden');
@@ -1232,46 +1051,7 @@ function renderPatternDetail(cf,sys,sym,pat,fromHistory=false){
   requestAnimationFrame(equalizeTopCards);
 }
 
-/* ---------- イベント: 4段階 ---------- */
-classificationSelect.addEventListener('change',()=>{
-  const cf=classificationSelect.value;
-  systemSelect.innerHTML='<option value="">--</option>';
-  symptomSelect.innerHTML='<option value="">--</option>';
-  patternSelect.innerHTML='<option value="">--</option>';
-  systemSelect.disabled=true; systemSelect.classList.remove('is-system-disabled');
-  symptomSelect.disabled=true; patternSelect.disabled=true;
-  clinicalResultEl.classList.add('hidden');
-  clinicalGroupsEl.innerHTML='';
-  if(cf) renderSystemOptions(cf);
-  requestAnimationFrame(equalizeTopCards);
-});
-systemSelect.addEventListener('change',()=>{
-  const cf=classificationSelect.value;
-  const sys=systemSelect.disabled?'-':systemSelect.value;
-  symptomSelect.innerHTML='<option value="">--</option>';
-  patternSelect.innerHTML='<option value="">--</option>'; patternSelect.disabled=true;
-  clinicalResultEl.classList.add('hidden'); clinicalGroupsEl.innerHTML='';
-  if(cf && sys) renderSymptomOptions(cf,sys);
-  requestAnimationFrame(equalizeTopCards);
-});
-symptomSelect.addEventListener('change',()=>{
-  const cf=classificationSelect.value;
-  const sys=systemSelect.disabled?'-':systemSelect.value;
-  const sym=symptomSelect.value;
-  patternSelect.innerHTML='<option value="">--</option>';
-  clinicalResultEl.classList.add('hidden'); clinicalGroupsEl.innerHTML='';
-  if(cf && sys && sym) renderPatternOptions(cf,sys,sym);
-  requestAnimationFrame(equalizeTopCards);
-});
-patternSelect.addEventListener('change',()=>{
-  const cf=classificationSelect.value;
-  const sys=systemSelect.disabled?'-':systemSelect.value;
-  const sym=symptomSelect.value;
-  const pat=patternSelect.value;
-  if(pat) renderPatternDetail(cf,sys,sym,pat,false);
-});
-
-/* ---------- クリック(関連病証リンク) ---------- */
+/* 関連病証クリック */
 document.addEventListener('click',e=>{
   const a=e.target.closest('.acu-pattern-link');
   if(!a) return;
@@ -1305,7 +1085,7 @@ document.addEventListener('click',e=>{
   });
 });
 
-/* ---------- クリック(治療方針内経穴) ---------- */
+/* 治療方針内経穴クリック */
 document.addEventListener('click',e=>{
   const a=e.target.closest('.treat-point-link');
   if(!a) return;
@@ -1315,7 +1095,7 @@ document.addEventListener('click',e=>{
   if(p) showPointDetail(p); else showUnknownPoint(nm);
 });
 
-/* ---------- Home ---------- */
+/* Home */
 function goHome(suppress=false){
   inputEl.value='';
   clearSuggestions();
@@ -1342,7 +1122,7 @@ function goHome(suppress=false){
 }
 homeBtn.addEventListener('click',()=>goHome());
 
-/* ---------- ナビキー ---------- */
+/* ナビキー */
 backBtn.addEventListener('click',goBack);
 forwardBtn.addEventListener('click',goForward);
 document.addEventListener('keydown',e=>{
@@ -1352,12 +1132,12 @@ document.addEventListener('keydown',e=>{
   }
 });
 
-/* ---------- 検索 ---------- */
+/* 検索 */
 function runSearch(){
   if(!DATA_READY) return;
-  const q=removeAllUnicodeSpaces(inputEl.value);
+  const q=normalizeKey(inputEl.value);
   if(!q){ clearSuggestions(); return; }
-  const exact=ACUPOINTS.find(p=>p.name===q);
+  const exact=ACUPOINTS.find(p=>normalizeKey(p.name)===q);
   if(exact){ selectPoint(exact); return; }
   const list=filterPoints(q);
   if(list.length===1) selectPoint(list[0]);
@@ -1371,7 +1151,7 @@ inputEl.addEventListener('keydown',e=>{
 inputEl.addEventListener('input',()=>{
   if(!DATA_READY) return;
   const val=inputEl.value;
-  if(removeAllUnicodeSpaces(val).length<MIN_QUERY_LENGTH){ clearSuggestions(); return; }
+  if(normalizeKey(val).length<MIN_QUERY_LENGTH){ clearSuggestions(); return; }
   renderSuggestions(filterPoints(val));
 });
 searchBtn.addEventListener('click',runSearch);
@@ -1381,7 +1161,7 @@ document.addEventListener('click',e=>{
   }
 });
 
-/* ---------- CSV ロード ---------- */
+/* CSV ロード */
 async function loadAcuCSV(){
   statusEl.textContent='経穴CSV: 読込中';
   try{
@@ -1399,7 +1179,6 @@ async function loadAcuCSV(){
     requestAnimationFrame(equalizeTopCards);
   }
 }
-
 async function loadClinicalCSV(){
   clinicalStatusEl.textContent='臨床CSV: 読込中';
   try{
@@ -1407,7 +1186,7 @@ async function loadClinicalCSV(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     rawClinicalCSV=await res.text();
     CLINICAL_DATA=parseClinicalCSV(rawClinicalCSV);
-    // tokens補填
+    // tokens 補填
     CLINICAL_DATA.order.forEach(cat=>{
       const catObj=CLINICAL_DATA.cats[cat];
       if(!catObj) return;
@@ -1422,6 +1201,10 @@ async function loadClinicalCSV(){
     buildClinicalHierarchyFromRaw(rawClinicalCSV);
     populateClassification();
     clinicalStatusEl.textContent=`臨床CSV: 分類 ${Object.keys(clinicalHierarchy).length}件`;
+    if(DEBUG_CLINICAL_PARSE){
+      console.log('CLINICAL_DATA',CLINICAL_DATA);
+      console.log('ACUPOINT_PATTERN_INDEX keys',Object.keys(ACUPOINT_PATTERN_INDEX).slice(0,50),'...');
+    }
     requestAnimationFrame(()=>{
       equalizeTopCards();
       setTimeout(equalizeTopCards,60);
@@ -1435,7 +1218,7 @@ async function loadClinicalCSV(){
   }
 }
 
-/* ---------- 初期化 ---------- */
+/* 初期化 */
 function init(){
   loadAcuCSV();
   loadClinicalCSV();
