@@ -1,14 +1,15 @@
 /******************************************************
  * 経穴検索 + 臨床病証 (4階層: 分類/系統/症状/病証) + 履歴 + 画像 + ギャラリー
- * APP_VERSION 20250930-HIERARCHY-FIX1
+ * APP_VERSION 20250930-HIERARCHY-FIX2
  *
- * FIX1:
- *  - 分類検出ロジック再実装 (後方探索) で「治療方針(治法)」混入を防止
- *  - 系統が '-' のとき select を完全 disabled + 直接症状表示
- *  - 症状が 1 個しか出なくなる問題を解消 (誤った階層分割を修正)
+ * FIX2 (state machine parser):
+ *  - 分類はホワイトリスト 3 件のみ
+ *  - 状態マシンで 1 パス処理 (後方探索廃止)
+ *  - 系統/症状誤検出による症状 1 件問題を解消
+ *  - 系統不在時は system='-' 自動適用
  ******************************************************/
 
-const APP_VERSION = '20250930-HIERARCHY-FIX1';
+const APP_VERSION = '20250930-HIERARCHY-FIX2';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -583,7 +584,8 @@ function parseCSVLogicalRow(row){
   cols.push(cur);
   return cols.map(c=>c.replace(/\uFEFF/g,'').replace(/\u00A0/g,' ').trim());
 }
-/* 治療方針セル分解 (復活追加) */
+
+/* 治療方針セル分解 */
 function dissectTreatmentCell(cell){
   if(!cell) return {label:'',rawPoints:'',comment:''};
   const lines=cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
@@ -607,131 +609,160 @@ function dissectTreatmentCell(cell){
   } else label=main.trim();
   return {label,rawPoints,comment};
 }
-/* ------------ FIX1: 階層検出 (後方探索) ------------ */
-function isPatternHeaderRow(row){
+
+/* ------------ 状態マシン CSV パーサ (FIX2) ------------ */
+const CLASSIFICATION_WHITELIST = new Set([
+  '1.疼痛',
+  '2.臓腑と関連する症候',
+  '3.全身の症候'
+]);
+
+function isPatternHeader(row){
   if(!row || !row.length) return false;
-  return /病証名/.test((row[0]||'').replace(/\s+/g,''));
+  return /病証名/.test(removeAllUnicodeSpaces(row[0]||''));
 }
-function isNumberDotCell(cell){
-  return /^[0-9０-９]+\.?.*/.test(removeAllUnicodeSpaces(cell||''));
-}
-function isTreatmentHeader(cell){
+function isTreatmentHeaderCell(cell){
   return /治療方針/.test(removeAllUnicodeSpaces(cell||''));
 }
-function isSystemCell(cell){
-  const fc=removeAllUnicodeSpaces(cell||'');
-  return fc==='-' || /系統/.test(fc);
+function normalizeFirst(cell){
+  return trimOuter(cell||'').replace(/\u3000/g,' ');
 }
-function isInvalidForClassification(cell){
-  return isTreatmentHeader(cell) || /病証名/.test(removeAllUnicodeSpaces(cell||'')) || removeAllUnicodeSpaces(cell||'')==='-';
+function isSystemLine(firstCell){
+  const fc=removeAllUnicodeSpaces(firstCell||'');
+  if(fc==='-') return true;
+  return /系統/.test(fc);
 }
-function parseClinicalHierarchyFixed(raw){
-  const logical = rebuildLogicalRows(raw);
-  const table   = logical.map(parseCSVLogicalRow);
-  const hierarchy={};
-  const order=[];
+function isClassificationLine(firstCell){
+  const norm=normalizeFirst(firstCell);
+  return CLASSIFICATION_WHITELIST.has(removeAllUnicodeSpaces(norm));
+}
+function isNumberedLine(firstCell){
+  return /^[0-9０-９]+\.?.*/.test(removeAllUnicodeSpaces(firstCell||''));
+}
+function isSymptomLine(firstCell){
+  if(!firstCell) return false;
+  const f=normalizeFirst(firstCell);
+  if(isClassificationLine(f)) return false;
+  if(isSystemLine(f)) return false;
+  if(isTreatmentHeaderCell(f)) return false;
+  if(/病証名/.test(removeAllUnicodeSpaces(f))) return false;
+  if(removeAllUnicodeSpaces(f)==='-') return false;
+  if(!isNumberedLine(f)) return false;
+  return true;
+}
 
-  function getFirst(row){ return (row && row[0])? row[0].trim():''; }
+function parseClinicalHierarchyStateMachine(raw){
+  const logical=rebuildLogicalRows(raw);
+  const table=logical.map(parseCSVLogicalRow);
+
+  const hierarchy={};
+  const classificationsOrder=[];
+  let currentClassification=null;
+  let currentSystem=null;
+  let currentSymptom=null;
 
   for(let i=0;i<table.length;i++){
     const row=table[i];
-    if(!isPatternHeaderRow(row)) continue;
+    if(!row.length){ continue; }
+    const first = row[0] ? row[0].trim() : '';
 
-    // 1) 症状行探索 (直前側)
-    let symptomIdx=-1;
-    for(let s=i-1; s>=0; s--){
-      const fc=getFirst(table[s]);
-      if(!fc) continue;
-      if(isTreatmentHeader(fc)) continue;
-      if(isPatternHeaderRow(table[s])) continue;
-      if(isSystemCell(fc)) continue;
-      if(isNumberDotCell(fc)){ symptomIdx=s; break; }
-    }
-    if(symptomIdx===-1) continue;
-    const symptom = trimOuter(getFirst(table[symptomIdx]));
-
-    // 2) 系統探索 (症状の上)
-    let systemIdx=-1;
-    for(let sy=symptomIdx-1; sy>=0; sy--){
-      const fc=getFirst(table[sy]);
-      if(!fc) continue;
-      if(isTreatmentHeader(fc)) continue;
-      if(isPatternHeaderRow(table[sy])) continue;
-      if(isSystemCell(fc)){ systemIdx=sy; break; }
-      // もし別の明確な分類候補に到達したら打ち切り
-      if(isNumberDotCell(fc) && !/系統/.test(fc)){
-        break;
+    // 分類行
+    if(isClassificationLine(first)){
+      currentClassification = normalizeFirst(first);
+      if(!hierarchy[currentClassification]){
+        hierarchy[currentClassification]={};
+        classificationsOrder.push(currentClassification);
       }
-    }
-    let system = systemIdx!==-1 ? trimOuter(getFirst(table[systemIdx])) : '-';
-
-    // 3) 分類探索 (系統行の上 もしくは症状行の上)
-    let classificationIdx=-1;
-    const startForClass = (systemIdx!==-1? systemIdx-1: symptomIdx-1);
-    for(let c=startForClass; c>=0; c--){
-      const fc=getFirst(table[c]);
-      if(!fc) continue;
-      if(isInvalidForClassification(fc)) continue;
-      if(isSystemCell(fc)) continue;
-      if(isNumberDotCell(fc)){ classificationIdx=c; break; }
-    }
-    if(classificationIdx===-1) continue;
-    const classification = trimOuter(getFirst(table[classificationIdx]));
-
-    if(!hierarchy[classification]){
-      hierarchy[classification]={};
-      order.push(classification);
-    }
-    if(!hierarchy[classification][system]){
-      hierarchy[classification][system]={};
-    }
-    if(!hierarchy[classification][system][symptom]){
-      hierarchy[classification][system][symptom]={
-        patterns:[],
-        groupsByPattern:{}
-      };
+      currentSystem=null;
+      currentSymptom=null;
+      continue;
     }
 
-    // パターン抽出
-    const patterns=row.slice(1)
-      .map(c=>c.trim())
-      .filter(c=>c && !/^治療方針/.test(c));
-
-    patterns.forEach(p=>{
-      if(!hierarchy[classification][system][symptom].patterns.includes(p)){
-        hierarchy[classification][system][symptom].patterns.push(p);
-        hierarchy[classification][system][symptom].groupsByPattern[p]=[];
+    // 系統行
+    if(isSystemLine(first) && currentClassification){
+      currentSystem = normalizeFirst(first); // '-' か '1.肝系統' 等
+      currentSymptom=null;
+      if(!hierarchy[currentClassification][currentSystem]){
+        hierarchy[currentClassification][currentSystem]={};
       }
-    });
+      continue;
+    }
 
-    // 4) 治療方針行収集 (パターン行直後)
-    let j=i+1;
-    while(j<table.length){
-      const nr=table[j];
-      if(!nr || !nr.length){ j++; continue; }
-      const fc=getFirst(nr);
-      // 次の病証名 or 次の症状/分類開始の兆候で終了
-      if(isPatternHeaderRow(nr)) break;
-      if(isNumberDotCell(fc) && nr.slice(1).every(x=>!x)){ // 単独番号行(分類/系統/症状候補)
-        break;
+    // 症状行
+    if(isSymptomLine(first) && currentClassification){
+      // 系統未確定なら '-' を自動
+      if(!currentSystem){
+        currentSystem='-';
+        if(!hierarchy[currentClassification][currentSystem]){
+          hierarchy[currentClassification][currentSystem]={};
+        }
       }
-      if(isTreatmentHeader(fc)){
-        const after=nr.slice(1);
-        after.forEach((cell,k)=>{
-          const pat=patterns[k];
-          if(!pat || !cell) return;
-          const parsed=dissectTreatmentCell(cell);
+      currentSymptom = normalizeFirst(first);
+      if(!hierarchy[currentClassification][currentSystem][currentSymptom]){
+        hierarchy[currentClassification][currentSystem][currentSymptom]={
+          patterns:[],
+          groupsByPattern:{}
+        };
+      }
+      continue;
+    }
+
+    // 病証名ヘッダ
+    if(isPatternHeader(row) && currentClassification && currentSymptom){
+      if(!currentSystem){
+        currentSystem='-';
+        if(!hierarchy[currentClassification][currentSystem]){
+          hierarchy[currentClassification][currentSystem]={};
+        }
+        if(!hierarchy[currentClassification][currentSystem][currentSymptom]){
+          hierarchy[currentClassification][currentSystem][currentSymptom]={
+            patterns:[],groupsByPattern:{}
+          };
+        }
+      }
+      const node = hierarchy[currentClassification][currentSystem][currentSymptom];
+      const patterns=row.slice(1)
+        .map(c=>c.trim())
+        .filter(c=>c && !/^治療方針/.test(c));
+      patterns.forEach(p=>{
+        if(!node.patterns.includes(p)){
+          node.patterns.push(p);
+          node.groupsByPattern[p]=[];
+        }
+      });
+
+      // 後続の治療方針行
+      let j=i+1;
+      while(j<table.length){
+        const nr=table[j];
+        if(!nr.length){ j++; continue; }
+        const nf=nr[0]? nr[0].trim():'';
+        if(isPatternHeader(nr)) break;                 // 次の病証名
+        if(isClassificationLine(nf)) break;            // 次の分類
+        if(isSystemLine(nf)) break;                    // 次の系統
+        if(isSymptomLine(nf)) break;                   // 次の症状
+
+        if(isTreatmentHeaderCell(nf)){
+          const after=nr.slice(1);
+          after.forEach((cell,k)=>{
+            const pat=patterns[k];
+            if(!pat || !cell) return;
+            const parsed=dissectTreatmentCell(cell);
             if(parsed.label || parsed.rawPoints){
               if(!parsed.tokens) parsed.tokens=parseTreatmentPoints(parsed.rawPoints);
-              hierarchy[classification][system][symptom].groupsByPattern[pat].push(parsed);
+              node.groupsByPattern[pat].push(parsed);
             }
-        });
+          });
+        }
+        j++;
       }
-      j++;
+      continue;
     }
+
+    // それ以外は無視
   }
 
-  // tokens 補完（念のため）
+  // tokens補完（念のため）
   Object.keys(hierarchy).forEach(cls=>{
     Object.keys(hierarchy[cls]).forEach(sys=>{
       Object.keys(hierarchy[cls][sys]).forEach(sym=>{
@@ -745,10 +776,10 @@ function parseClinicalHierarchyFixed(raw){
     });
   });
 
-  return {hierarchy, classificationsOrder:order};
+  return {hierarchy, classificationsOrder};
 }
 
-/* ------------ 逆インデックス再構築 ------------ */
+/* ------------ 逆インデックス ------------ */
 function rebuildAcuPointPatternIndex(){
   ACUPOINT_PATTERN_INDEX={};
   Object.keys(CLINICAL_HIERARCHY).forEach(cls=>{
@@ -794,10 +825,7 @@ function equalizeTopCards(){
   symptomCard.style.height=maxH+'px';
 }
 
-/* ------------ サジェスト等 省略 (既存通り) ------------ */
-/* (既存 showPointDetail/renderRelatedPatterns/linkifyRegionAcupoints などは
-   そのまま流用 — ここから下は変更点のみ挿入 or 既存コード再掲) */
-
+/* ------------ Region/治療点リンク処理など（既存） ------------ */
 function matchTokenWithSpaces(raw,pos,token){
   let i=pos,k=0,len=raw.length;
   while(k<token.length){
@@ -851,7 +879,7 @@ function linkifyRegionAcupoints(html){
         if(matched){
           if(i>cursor) frag.appendChild(document.createTextNode(work.slice(cursor,i)));
           const a=document.createElement('a');
-            a.href='#';
+          a.href='#';
           a.className='treat-point-link';
           const p=findAcupointByToken(matched);
           if(p && p.important) a.classList.add('acu-important');
@@ -1005,12 +1033,10 @@ function handleClassificationChange(){
     return;
   }
   const systems = Object.keys(CLINICAL_HIERARCHY[cls]);
-  // 系統が "-" のみの場合: セレクト自体を disabled で表示
   if(systems.length===1 && systems[0]==='-'){
     systemSelect.innerHTML='<option value="-">-</option>';
     systemSelect.value='-';
     systemSelect.disabled=true;
-    // 症状を直接構築
     const symptoms=Object.keys(CLINICAL_HIERARCHY[cls]['-']);
     makeOptions(symptomSelect, symptoms, {placeholder:'(症状を選択)'});
     symptomSelect.disabled=false;
@@ -1153,7 +1179,6 @@ function selectHierarchy(cls, sys, sym, pat, suppressHistory){
   classificationSelect.value=cls;
   classificationSelect.dispatchEvent(new Event('change'));
 
-  // 系統 '-' 専用
   if(sys==='-' && CLINICAL_HIERARCHY[cls]['-']){
     systemSelect.innerHTML='<option value="-">-</option>';
     systemSelect.value='-';
@@ -1379,7 +1404,7 @@ async function loadClinicalCSV(){
     const res=await fetch(`${CLINICAL_CSV_PATH}?v=${APP_VERSION}&_=${Date.now()}`);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const text=await res.text();
-    const {hierarchy, classificationsOrder} = parseClinicalHierarchyFixed(text); // FIX: 新ロジック
+    const {hierarchy, classificationsOrder} = parseClinicalHierarchyStateMachine(text);
     CLINICAL_HIERARCHY=hierarchy;
     CLASSIFICATIONS_ORDER=classificationsOrder;
     CLINICAL_READY=true;
