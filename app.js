@@ -176,17 +176,20 @@ function escapeHTML(s){
   });
 }
 // 旧 transformPatternDisplay と getDisplayPatternName をこの2つに置き換え
-function transformPatternDisplay(original){
-  if(!original) return '';
-  const idx = original.indexOf('→');
-  if(idx === -1) return original;
-  const left  = original.slice(0, idx).trim();
-  const right = original.slice(idx + 1).trim();
-  if(/^【[^】]+】$/.test(left) && right && !/^【/.test(right)){
-    return `${right}→${left}`;
-  }
-  return original;
-}
++// ==== パターン表示統一 ====
++// CSV 形式: 【病証】→症状
++// 画面表示: 症状→【病証】
++function getDisplayPatternName(original){
++  if(!original) return '';
++  const idx = original.indexOf('→');
++  if(idx === -1) return original;
++  const left  = original.slice(0, idx).trim();      // 【病証】
++  const right = original.slice(idx + 1).trim();     // 症状
++  if(/^【[^】]+】/.test(left)){
++    return `${right}→${left}`;
++  }
++  return original;
++}
 function getDisplayPatternName(n){ 
   return transformPatternDisplay(n);
 }
