@@ -175,19 +175,21 @@ function escapeHTML(s){
     }
   });
 }
-// 差し替え後の関数
+// 旧 transformPatternDisplay と getDisplayPatternName をこの2つに置き換え
 function transformPatternDisplay(original){
   if(!original) return '';
   const idx = original.indexOf('→');
   if(idx === -1) return original;
   const left  = original.slice(0, idx).trim();
   const right = original.slice(idx + 1).trim();
-  if(/^【[^】]+】$/.test(left) && !/^【[^】]+】/.test(right)){
+  if(/^【[^】]+】$/.test(left) && right && !/^【/.test(right)){
     return `${right}→${left}`;
   }
   return original;
 }
-function getDisplayPatternName(n){ return transformPatternDisplay(n); }
+function getDisplayPatternName(n){ 
+  return transformPatternDisplay(n);
+}
 function ensureCommentParens(c){
   if(!c) return '';
   if(/^\s*[（(]/.test(c)) return c;
