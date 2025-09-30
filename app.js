@@ -175,12 +175,14 @@ function escapeHTML(s){
     }
   });
 }
+// 差し替え後の関数
 function transformPatternDisplay(original){
-  const idx=original.indexOf('→');
-  if(idx===-1) return original;
-  const left=original.slice(0,idx).trim();
-  const right=original.slice(idx+1).trim();
-  if(/^【.+】$/.test(left)&&right&&!/^【.+】$/.test(right)){
+  if(!original) return '';
+  const idx = original.indexOf('→');
+  if(idx === -1) return original;
+  const left  = original.slice(0, idx).trim();
+  const right = original.slice(idx + 1).trim();
+  if(/^【[^】]+】$/.test(left) && !/^【[^】]+】/.test(right)){
     return `${right}→${left}`;
   }
   return original;
