@@ -583,7 +583,30 @@ function parseCSVLogicalRow(row){
   cols.push(cur);
   return cols.map(c=>c.replace(/\uFEFF/g,'').replace(/\u00A0/g,' ').trim());
 }
-
+/* 治療方針セル分解 (復活追加) */
+function dissectTreatmentCell(cell){
+  if(!cell) return {label:'',rawPoints:'',comment:''};
+  const lines=cell.split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  let comment='';
+  if(lines.length && /^[（(]/.test(lines[lines.length-1])) comment=lines.pop();
+  let main=lines.join(' ');
+  if(!main) main=cell;
+  const tail=main.match(/([（(].*?[）)])\s*$/);
+  if(tail){
+    comment=comment||tail[1];
+    main=main.slice(0,tail.index).trim();
+  }
+  let label='',rawPoints='';
+  const p1=main.indexOf('：'); const p2=main.indexOf(':');
+  let sep=-1;
+  if(p1>=0 && p2>=0) sep=Math.min(p1,p2);
+  else sep=p1>=0? p1:p2;
+  if(sep>=0){
+    label=main.slice(0,sep).trim();
+    rawPoints=main.slice(sep+1).trim();
+  } else label=main.trim();
+  return {label,rawPoints,comment};
+}
 /* ------------ FIX1: 階層検出 (後方探索) ------------ */
 function isPatternHeaderRow(row){
   if(!row || !row.length) return false;
