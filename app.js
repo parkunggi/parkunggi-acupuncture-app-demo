@@ -1,13 +1,13 @@
 /******************************************************
  * 経穴検索 + 臨床病証 (4階層) + 履歴 + 画像 + ギャラリー
- * APP_VERSION 20251001-HIERARCHY-FIX-SYNTAX4
+ * APP_VERSION 20251001-HIERARCHY-FIX-SYNTAX5
  *
- * 変更(FIX-SYNTAX4):
- *  - Enter キーでハイライト中サジェストを確定 (先頭に戻らない)
- *  - setActive の未定義変数参照バグ修正
- *  - それ以外のロジックは 20251001-HIERARCHY-FIX-SYNTAX3 と同一
+ * FIX-SYNTAX5:
+ *  - 経穴履歴クリックが反応しないことがある問題: renderPointHistoryMenu を一括 innerHTML 方式で再実装
+ *  - 戻る/進むで分類セレクトが空になる問題: home 遷移時に分類を消さない & ensureClassificationOptions 追加
+ *  - 既存 SYNTAX4 の Enter 確定 / setActive 修正を継承
  ******************************************************/
-const APP_VERSION = '20251001-HIERARCHY-FIX-SYNTAX4';
+const APP_VERSION = '20251001-HIERARCHY-FIX-SYNTAX5';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -168,14 +168,23 @@ function applyRedMarkup(text){
   if(text.includes('<span class="bui-red">')) return text;
   return text.replace(/\[\[([^\[\]\r\n]{1,120})\]\]/g,'<span class="bui-red">$1</span>');
 }
+function ensureClassificationOptions(){
+  if(!classificationSelect) return;
+  // 既に option が (分類を選択) + 他 ならスキップ
+  const realOptions = Array.from(classificationSelect.options).filter(o=>o.value);
+  if(realOptions.length===0 && CLASSIFICATIONS_ORDER.length){
+    makeOptions(classificationSelect, CLASSIFICATIONS_ORDER, {placeholder:'(分類を選択)'});
+    classificationSelect.disabled = false;
+  }
+}
 
 /* ==== 病証表示統一 (表示反転) ==== */
 function getDisplayPatternName(original){
   if(!original) return '';
   const idx = original.indexOf('→');
   if(idx === -1) return original;
-  const left  = original.slice(0, idx).trim();   // 【病証】
-  const right = original.slice(idx + 1).trim();  // 症状
+  const left  = original.slice(0, idx).trim();
+  const right = original.slice(idx + 1).trim();
   if(/^【[^】]+】$/.test(left)) return `${right}→${left}`;
   return original;
 }
@@ -264,7 +273,8 @@ function applyState(state){
 
     switch(state.type){
       case 'home':
-        resetHierarchySelects(true);
+        // 分類を消さない
+        resetHierarchySelects(false);
         inputEl.value='';
         inlineAcupointResult.classList.add('hidden');
         hideMeridianImage();
@@ -287,6 +297,7 @@ function applyState(state){
     }
 
     if(state.type==='home') showHomeGallery(); else hideHomeGallery();
+    ensureClassificationOptions();
 
     if(showPointFlag){
       inlineAcupointResult.classList.remove('hidden');
@@ -320,92 +331,84 @@ function renderPatternHistoryMenu(){
   patternHistoryMenuList.innerHTML='';
   const arr=[...patternHistory].reverse();
   if(!arr.length){
-    const li=document.createElement('li'); li.textContent='履歴なし';
-    patternHistoryMenuList.appendChild(li); return;
+    patternHistoryMenuList.innerHTML='<li>履歴なし</li>';
+    return;
   }
   const current = historyStack[historyIndex];
-  arr.forEach(entry=>{
+  const html = arr.map(entry=>{
     const st=entry.ref;
-    const li=document.createElement('li');
-    if(st===current) li.classList.add('active');
-    const label = getDisplayPatternName(st.pattern);
-    li.innerHTML=`
+    const active = (st===current);
+    const label = escapeHTML(getDisplayPatternName(st.pattern));
+    return `<li data-type="pattern" data-idx="${entry.idx}" class="${active?'active':''}">
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="hist-time">${formatTime(entry.ts)}</span>
       </div>
-      <div class="hist-label">${escapeHTML(label)}</div>`;
-    li.addEventListener('click', ()=>{
+      <div class="hist-label">${label}</div>
+    </li>`;
+  }).join('');
+  patternHistoryMenuList.innerHTML = html;
+  patternHistoryMenuList.querySelectorAll('li[data-type="pattern"]').forEach(li=>{
+    li.addEventListener('click',()=>{
       patternHistoryMenu.classList.add('hidden');
-      historyIndex = entry.idx;
+      const idx = Number(li.dataset.idx);
+      if(isNaN(idx) || !historyStack[idx]) return;
+      const st = historyStack[idx];
       const clone = {...st};
-      clone.showPoint   = isShown(inlineAcupointResult);
+      clone.showPoint = isShown(inlineAcupointResult);
       clone.showPattern = true;
+      historyIndex = idx;
       applyState(clone);
     });
-    patternHistoryMenuList.appendChild(li);
   });
 }
 function fallbackRenderPatternHistoryMenu(){
-  patternHistoryMenuList.innerHTML = patternHistory.length
-    ? patternHistory.slice().reverse().map(h=>{
-        const st=h.ref||{};
-        const label = getDisplayPatternName(st?.pattern||'?');
-        return `<li><div style="display:flex;align-items:center;gap:6px;">
-          <span class="hist-time">${formatTime(h.ts)}</span></div>
-          <div class="hist-label">${escapeHTML(label)}</div></li>`;
-      }).join('')
-    : '<li>履歴なし</li>';
+  renderPatternHistoryMenu(); // 同じ
 }
 
-/* 履歴メニュー (Point) */
+/* 履歴メニュー (Point) - 再実装 */
 function renderPointHistoryMenu(){
   pointHistoryMenuList.innerHTML='';
   const arr=[...pointHistory].reverse();
   if(!arr.length){
-    const li=document.createElement('li'); li.textContent='履歴なし';
-    pointHistoryMenuList.appendChild(li); return;
+    pointHistoryMenuList.innerHTML='<li>履歴なし</li>';
+    return;
   }
-  const current=historyStack[historyIndex];
-  arr.forEach(entry=>{
+  const current = historyStack[historyIndex];
+  const html = arr.map(entry=>{
     const st=entry.ref;
-    const li=document.createElement('li');
-    if(st===current) li.classList.add('active');
-    const label = (st.type==='unknownPoint') ? `未登録: ${st.name}` : `経穴: ${st.name}`;
-    li.innerHTML=`
+    const active = (st===current);
+    const label = st.type==='unknownPoint'
+      ? `未登録: ${escapeHTML(st.name)}`
+      : `経穴: ${escapeHTML(st.name)}`;
+    return `<li data-type="point" data-idx="${entry.idx}" class="${active?'active':''}">
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="hist-time">${formatTime(entry.ts)}</span>
       </div>
-      <div class="hist-label">${escapeHTML(label)}</div>`;
+      <div class="hist-label">${label}</div>
+    </li>`;
+  }).join('');
+  pointHistoryMenuList.innerHTML = html;
+  pointHistoryMenuList.querySelectorAll('li[data-type="point"]').forEach(li=>{
     li.addEventListener('click',()=>{
       pointHistoryMenu.classList.add('hidden');
-      historyIndex = entry.idx;
+      const idx = Number(li.dataset.idx);
+      if(isNaN(idx) || !historyStack[idx]) return;
+      const st = historyStack[idx];
       const clone = {...st};
       clone.showPattern = isShown(clinicalResultEl);
-      clone.showPoint   = true;
+      clone.showPoint = true;
+      historyIndex = idx;
       applyState(clone);
     });
-    patternHistoryMenuList.appendChild(li);
   });
 }
 function fallbackRenderPointHistoryMenu(){
-  pointHistoryMenuList.innerHTML = pointHistory.length
-    ? pointHistory.slice().reverse().map(h=>{
-        const st=h.ref||{};
-        const label= st && st.type==='unknownPoint' ? `未登録: ${st.name}` : `経穴: ${st?.name||'(不明)'}`;
-        return `<li><div style="display:flex;align-items:center;gap:6px;">
-          <span class="hist-time">${formatTime(h.ts)}</span></div>
-          <div class="hist-label">${escapeHTML(label)}</div></li>`;
-      }).join('')
-    : '<li>履歴なし</li>';
+  renderPointHistoryMenu(); // 同じ
 }
 
 /* Guard */
 function guardRender(renderFn,fallbackFn,kind){
   try{
-    if(typeof renderFn!=='function' || !/innerHTML/.test(renderFn.toString())){
-      console.warn(`[HISTORY-GUARD] ${kind} renderer overwritten. fallback`);
-      fallbackFn(); return;
-    }
     renderFn();
     const listEl = kind==='point'? pointHistoryMenuList : patternHistoryMenuList;
     const arr    = kind==='point'? pointHistory : patternHistory;
@@ -523,7 +526,7 @@ function parseTreatmentPoints(raw){
     .map(t=>t.trim())
     .filter(t=>t.length)
     .map(t=>t.replace(/[。.,、，;；/]+$/,''))
-    .map(t=>t.replace(/^[※＊*]+/,''))          // 先頭記号を除去
+    .map(t=>t.replace(/^[※＊*]+/,'')) // 先頭記号除去
     .filter(Boolean)
     .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));
 }
@@ -979,7 +982,7 @@ function makeOptions(selectEl, values, {placeholder, disabledSet} = {}){
 }
 
 function resetHierarchySelects(clearAll){
-  classificationSelect.value='';
+  // 分類は消さない方針（clearAllフラグは保持するが未使用）
   systemSelect.innerHTML='<option value="">(系統を選択)</option>';
   systemSelect.disabled=true;
   symptomSelect.innerHTML='<option value="">(症状を選択)</option>';
@@ -988,9 +991,6 @@ function resetHierarchySelects(clearAll){
   patternSelect.disabled=true;
   clinicalResultEl.classList.add('hidden');
   clinicalGroupsEl.innerHTML='';
-  if(clearAll){
-    classificationSelect.innerHTML='<option value="">(分類を選択)</option>';
-  }
 }
 
 function handleClassificationChange(){
@@ -1197,6 +1197,7 @@ function goHome(suppressHistory=false){
   if(span) span.textContent='';
   relatedSymptomsEl.innerHTML='<li>-</li>';
   showHomeGallery();
+  ensureClassificationOptions();
   window.scrollTo({top:0,behavior:'smooth'});
   requestAnimationFrame(()=>{ inputEl.focus(); inputEl.select(); });
   requestAnimationFrame(equalizeTopCards);
@@ -1253,7 +1254,6 @@ function setActive(items, idx){
     active.scrollIntoView({block:'nearest'});
   }
 }
-/* Enter で確定するための補助 */
 function selectActiveSuggestion(){
   if(suggestionListEl.classList.contains('hidden')) return false;
   const active = suggestionListEl.querySelector('li.active[data-id]');
@@ -1267,7 +1267,6 @@ function selectActiveSuggestion(){
   }
   return false;
 }
-
 function renderSuggestions(list){
   suggestionListEl.innerHTML='';
   const qRaw=removeAllUnicodeSpaces(inputEl.value);
@@ -1413,6 +1412,7 @@ async function loadClinicalCSV(){
     console.error('[LOAD] clinical error',err);
     clinicalStatusEl.textContent='臨床CSV: 失敗 '+err.message;
   }finally{
+    ensureClassificationOptions();
     requestAnimationFrame(equalizeTopCards);
   }
 }
