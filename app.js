@@ -1,15 +1,15 @@
 /******************************************************
  * 経穴検索 + 臨床病証 (4階層: 分類/系統/症状/病証) + 履歴 + 画像 + ギャラリー
- * APP_VERSION 20250930-HIERARCHY-FIX2
+ * APP_VERSION 20251001-HIERARCHY-FIX-SYNTAX
  *
- * FIX2 (state machine parser):
- *  - 分類はホワイトリスト 3 件のみ
- *  - 状態マシンで 1 パス処理 (後方探索廃止)
- *  - 系統/症状誤検出による症状 1 件問題を解消
- *  - 系統不在時は system='-' 自動適用
+ * - 状態マシン CSV パーサ
+ * - 分類ホワイトリスト 1.疼痛 / 2.臓腑と関連する症候 / 3.全身の症候
+ * - 病証内部値: CSV のまま (【病証】→症状)
+ * - 表示時のみ反転 (症状→【病証】) : ドロップダウン / タイトル / 関連リンク / 履歴
+ * - 前版の SyntaxError (行頭 '+' 残り / 二重定義) 修正
  ******************************************************/
 
-const APP_VERSION = '20250930-HIERARCHY-FIX2';
+const APP_VERSION = '20251001-HIERARCHY-FIX-SYNTAX';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -175,24 +175,6 @@ function escapeHTML(s){
     }
   });
 }
-// 旧 transformPatternDisplay と getDisplayPatternName をこの2つに置き換え
-+// ==== パターン表示統一 ====
-+// CSV 形式: 【病証】→症状
-+// 画面表示: 症状→【病証】
-+function getDisplayPatternName(original){
-+  if(!original) return '';
-+  const idx = original.indexOf('→');
-+  if(idx === -1) return original;
-+  const left  = original.slice(0, idx).trim();      // 【病証】
-+  const right = original.slice(idx + 1).trim();     // 症状
-+  if(/^【[^】]+】/.test(left)){
-+    return `${right}→${left}`;
-+  }
-+  return original;
-+}
-function getDisplayPatternName(n){ 
-  return transformPatternDisplay(n);
-}
 function ensureCommentParens(c){
   if(!c) return '';
   if(/^\s*[（(]/.test(c)) return c;
@@ -202,6 +184,19 @@ function applyRedMarkup(text){
   if(!text) return '';
   if(text.includes('<span class="bui-red">')) return text;
   return text.replace(/\[\[([^\[\]\r\n]{1,120})\]\]/g,'<span class="bui-red">$1</span>');
+}
+
+/* ==== 病証表示統一 (CSV: 【病証】→症状, 表示: 症状→【病証】) ==== */
+function getDisplayPatternName(original){
+  if(!original) return '';
+  const idx = original.indexOf('→');
+  if(idx === -1) return original;
+  const left  = original.slice(0, idx).trim();   // 【病証】
+  const right = original.slice(idx + 1).trim();  // 症状
+  if(/^【[^】]+】$/.test(left)){
+    return `${right}→${left}`;
+  }
+  return original;
 }
 
 /* ------------ 履歴 ------------ */
@@ -617,7 +612,7 @@ function dissectTreatmentCell(cell){
   return {label,rawPoints,comment};
 }
 
-/* ------------ 状態マシン CSV パーサ (FIX2) ------------ */
+/* ------------ 状態マシン CSV パーサ ------------ */
 const CLASSIFICATION_WHITELIST = new Set([
   '1.疼痛',
   '2.臓腑と関連する症候',
@@ -687,7 +682,7 @@ function parseClinicalHierarchyStateMachine(raw){
 
     // 系統行
     if(isSystemLine(first) && currentClassification){
-      currentSystem = normalizeFirst(first); // '-' か '1.肝系統' 等
+      currentSystem = normalizeFirst(first); // '-' or '1.肝系統'
       currentSymptom=null;
       if(!hierarchy[currentClassification][currentSystem]){
         hierarchy[currentClassification][currentSystem]={};
@@ -697,7 +692,6 @@ function parseClinicalHierarchyStateMachine(raw){
 
     // 症状行
     if(isSymptomLine(first) && currentClassification){
-      // 系統未確定なら '-' を自動
       if(!currentSystem){
         currentSystem='-';
         if(!hierarchy[currentClassification][currentSystem]){
@@ -734,20 +728,20 @@ function parseClinicalHierarchyStateMachine(raw){
       patterns.forEach(p=>{
         if(!node.patterns.includes(p)){
           node.patterns.push(p);
-          node.groupsByPattern[p]=[];
+            node.groupsByPattern[p]=[];
         }
       });
 
-      // 後続の治療方針行
+      // 後続 治療方針行
       let j=i+1;
       while(j<table.length){
         const nr=table[j];
         if(!nr.length){ j++; continue; }
         const nf=nr[0]? nr[0].trim():'';
-        if(isPatternHeader(nr)) break;                 // 次の病証名
-        if(isClassificationLine(nf)) break;            // 次の分類
-        if(isSystemLine(nf)) break;                    // 次の系統
-        if(isSymptomLine(nf)) break;                   // 次の症状
+        if(isPatternHeader(nr)) break;
+        if(isClassificationLine(nf)) break;
+        if(isSystemLine(nf)) break;
+        if(isSymptomLine(nf)) break;
 
         if(isTreatmentHeaderCell(nf)){
           const after=nr.slice(1);
@@ -765,11 +759,9 @@ function parseClinicalHierarchyStateMachine(raw){
       }
       continue;
     }
-
-    // それ以外は無視
   }
 
-  // tokens補完（念のため）
+  // tokens補完
   Object.keys(hierarchy).forEach(cls=>{
     Object.keys(hierarchy[cls]).forEach(sys=>{
       Object.keys(hierarchy[cls][sys]).forEach(sym=>{
@@ -832,7 +824,7 @@ function equalizeTopCards(){
   symptomCard.style.height=maxH+'px';
 }
 
-/* ------------ Region/治療点リンク処理など（既存） ------------ */
+/* ------------ Region/治療点リンク ------------ */
 function matchTokenWithSpaces(raw,pos,token){
   let i=pos,k=0,len=raw.length;
   while(k<token.length){
@@ -928,6 +920,7 @@ function updateMeridianImage(meridian){
   }
 }
 
+/* ------------ 経穴表示 ------------ */
 function showPointDetail(p, suppressHistory=false){
   hideHomeGallery();
   let regionHTML=p.region||'';
@@ -1004,7 +997,7 @@ function makeOptions(selectEl, values, {placeholder, disabledSet} = {}){
   }
   values.forEach(v=>{
     const opt=document.createElement('option');
-    opt.value=v; opt.textContent=v;
+    opt.value=v; opt.textContent=v; // patternSelect は後段で表示反転
     if(disabledSet && disabledSet.has(v)){
       opt.disabled=true;
       opt.classList.add('disabled');
@@ -1029,6 +1022,7 @@ function resetHierarchySelects(clearAll){
   }
 }
 
+/* 分類変更 */
 function handleClassificationChange(){
   const cls = classificationSelect.value;
   systemSelect.innerHTML=''; symptomSelect.innerHTML=''; patternSelect.innerHTML='';
@@ -1063,6 +1057,7 @@ function handleClassificationChange(){
   requestAnimationFrame(equalizeTopCards);
 }
 
+/* 系統変更 */
 function handleSystemChange(){
   const cls = classificationSelect.value;
   const sys = systemSelect.value;
@@ -1086,6 +1081,7 @@ function handleSystemChange(){
   requestAnimationFrame(equalizeTopCards);
 }
 
+/* 症状変更 → 病証リスト生成 & 表示反転 */
 function handleSymptomChange(){
   const cls = classificationSelect.value;
   const sys = systemSelect.value || (CLINICAL_HIERARCHY[cls] && CLINICAL_HIERARCHY[cls]['-'] ? '-' : '');
@@ -1101,11 +1097,20 @@ function handleSymptomChange(){
   const patterns = CLINICAL_HIERARCHY[cls][sys][sym].patterns;
   makeOptions(patternSelect, patterns, {placeholder:'(病証を選択)'});
   patternSelect.disabled=false;
+
+  // 表示のみ反転
+  Array.from(patternSelect.options).forEach(opt=>{
+    if(opt.value){
+      opt.textContent = getDisplayPatternName(opt.value);
+    }
+  });
+
   clinicalGroupsEl.innerHTML='';
   clinicalResultEl.classList.add('hidden');
   requestAnimationFrame(equalizeTopCards);
 }
 
+/* 病証選択 */
 function handlePatternChange(){
   hideHomeGallery();
   const cls=classificationSelect.value;
@@ -1155,7 +1160,7 @@ systemSelect.addEventListener('change', handleSystemChange);
 symptomSelect.addEventListener('change', handleSymptomChange);
 patternSelect.addEventListener('change', handlePatternChange);
 
-/* 病証リンク (関連リスト) */
+/* 病証リンク (関連リストから遷移) */
 document.addEventListener('click', e=>{
   const a=e.target.closest('.acu-pattern-link');
   if(!a) return;
@@ -1206,6 +1211,10 @@ function selectHierarchy(cls, sys, sym, pat, suppressHistory){
   if(CLINICAL_HIERARCHY[cls][sys] && CLINICAL_HIERARCHY[cls][sys][sym] &&
      CLINICAL_HIERARCHY[cls][sys][sym].patterns.includes(pat)){
     patternSelect.value=pat;
+    // 反転表示再適用（読み替え済みかもしれないが念のため）
+    Array.from(patternSelect.options).forEach(opt=>{
+      if(opt.value) opt.textContent=getDisplayPatternName(opt.value);
+    });
     patternSelect.dispatchEvent(new Event('change'));
     if(suppressHistory){
       IS_APPLYING_HISTORY=true;
@@ -1279,7 +1288,7 @@ function setActive(items,idx){
   });
   if(items[idx]){
     items[idx].classList.add('active');
-    items[idx].setAttribute('aria-selected','true');
+    li.setAttribute('aria-selected','true');
     items[idx].scrollIntoView({block:'nearest'});
   }
 }
