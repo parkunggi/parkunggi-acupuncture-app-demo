@@ -1,13 +1,13 @@
 /******************************************************
  * 経穴検索 + 臨床病証 (4階層) + 履歴 + 画像 + ギャラリー
- * APP_VERSION 20251001-HIERARCHY-FIX-SYNTAX3
+ * APP_VERSION 20251001-HIERARCHY-FIX-SYNTAX4
  *
- * 変更(FIX-SYNTAX3):
- *  - サジェスト上下キーが2行飛ぶ問題を修正 (keyup 側で矢印処理を除去)
- *  - 治療方針内 "※陽陵泉" 形式で先頭記号付き経穴のリンク化を改善
- *  - setActive のスコープバグ修正
+ * 変更(FIX-SYNTAX4):
+ *  - Enter キーでハイライト中サジェストを確定 (先頭に戻らない)
+ *  - setActive の未定義変数参照バグ修正
+ *  - それ以外のロジックは 20251001-HIERARCHY-FIX-SYNTAX3 と同一
  ******************************************************/
-const APP_VERSION = '20251001-HIERARCHY-FIX-SYNTAX3';
+const APP_VERSION = '20251001-HIERARCHY-FIX-SYNTAX4';
 
 const CSV_FILE = '経穴・経絡.csv';
 const CLINICAL_CSV_FILE = '東洋臨床論.csv';
@@ -384,7 +384,7 @@ function renderPointHistoryMenu(){
       clone.showPoint   = true;
       applyState(clone);
     });
-    pointHistoryMenuList.appendChild(li);
+    patternHistoryMenuList.appendChild(li);
   });
 }
 function fallbackRenderPointHistoryMenu(){
@@ -523,7 +523,7 @@ function parseTreatmentPoints(raw){
     .map(t=>t.trim())
     .filter(t=>t.length)
     .map(t=>t.replace(/[。.,、，;；/]+$/,''))
-    .map(t=>t.replace(/^[※＊*]+/,''))          // 追加: 先頭記号を除去
+    .map(t=>t.replace(/^[※＊*]+/,''))          // 先頭記号を除去
     .filter(Boolean)
     .filter(t=>!/^[-・※＊*+/／\/]+$/.test(t));
 }
@@ -717,7 +717,7 @@ function parseClinicalHierarchyStateMachine(raw){
         if(isSymptomLine(nf)) break;
         if(isTreatmentHeaderCell(nf)){
           const after=nr.slice(1);
-            after.forEach((cell,k)=>{
+          after.forEach((cell,k)=>{
             const pat=patterns[k];
             if(!pat || !cell) return;
             const parsed=dissectTreatmentCell(cell);
@@ -1241,18 +1241,33 @@ function clearSuggestions(){
   inputEl.setAttribute('aria-expanded','false');
   requestAnimationFrame(equalizeTopCards);
 }
-function setActive(items,idx){
+function setActive(items, idx){
   items.forEach(li=>{
     li.classList.remove('active');
     li.setAttribute('aria-selected','false');
   });
   if(items[idx]){
-    const active=items[idx];
+    const active = items[idx];
     active.classList.add('active');
     active.setAttribute('aria-selected','true');
     active.scrollIntoView({block:'nearest'});
   }
 }
+/* Enter で確定するための補助 */
+function selectActiveSuggestion(){
+  if(suggestionListEl.classList.contains('hidden')) return false;
+  const active = suggestionListEl.querySelector('li.active[data-id]');
+  if(!active) return false;
+  const id = active.dataset.id;
+  if(!id) return false;
+  const p = ACUPOINTS.find(x=>x.name===id);
+  if(p){
+    selectPoint(p);
+    return true;
+  }
+  return false;
+}
+
 function renderSuggestions(list){
   suggestionListEl.innerHTML='';
   const qRaw=removeAllUnicodeSpaces(inputEl.value);
@@ -1308,10 +1323,12 @@ function handleSuggestionKeyboard(e){
     setActive(items,current);
   }else if(e.key==='Enter'){
     e.preventDefault();
-    const act=items[current>=0?current:0];
-    if(act && act.dataset.id){
-      const p=ACUPOINTS.find(x=>x.name===act.dataset.id);
-      if(p) selectPoint(p);
+    if(!selectActiveSuggestion()){
+      const act=items[current>=0?current:0];
+      if(act && act.dataset.id){
+        const p=ACUPOINTS.find(x=>x.name===act.dataset.id);
+        if(p) selectPoint(p);
+      }
     }
   }else if(e.key==='Escape'){
     clearSuggestions();
@@ -1339,8 +1356,12 @@ inputEl.addEventListener('keyup', e=>{
   renderSuggestions(filterPoints(val));
 });
 inputEl.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); runSearch(); }
-  else if(['ArrowDown','ArrowUp','Escape'].includes(e.key)){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(!selectActiveSuggestion()){
+      runSearch();
+    }
+  } else if(['ArrowDown','ArrowUp','Escape'].includes(e.key)){
     handleSuggestionKeyboard(e);
   }
 });
