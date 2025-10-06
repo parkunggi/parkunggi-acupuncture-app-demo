@@ -1,0 +1,98 @@
+[
+  {
+    "id": "LI4",
+    "name_ja": "合谷",
+    "name_en": "Hegu",
+    "meridian": "LargeIntestine",
+    "position": {
+      "x": 1.2,
+      "y": -0.5,
+      "z": 0.8
+    },
+    "description": "手の甲の親指と人差し指の間に位置する重要なツボ。頭痛、歯痛、ストレス緩和に効果があります。"
+  },
+  {
+    "id": "ST36",
+    "name_ja": "足三里",
+    "name_en": "Zusanli",
+    "meridian": "Stomach",
+    "position": {
+      "x": 0.3,
+      "y": -2.5,
+      "z": 0.4
+    },
+    "description": "膝の下、脛骨外側に位置する胃経の重要なツボ。消化不良、疲労回復、免疫力向上に効果があります。"
+  },
+  {
+    "id": "GV20",
+    "name_ja": "百会",
+    "name_en": "Baihui",
+    "meridian": "GoverningVessel",
+    "position": {
+      "x": 0,
+      "y": 2.8,
+      "z": 0
+    },
+    "description": "頭頂部の中央に位置する督脈のツボ。頭痛、めまい、記憶力向上に効果があります。"
+  },
+  {
+    "id": "GV16",
+    "name_ja": "風府",
+    "name_en": "Fengfu",
+    "meridian": "GoverningVessel",
+    "position": {
+      "x": 0,
+      "y": 2.2,
+      "z": -0.8
+    },
+    "description": "後頭部、首の付け根に位置する督脈のツボ。首の痛み、頭痛、精神安定に効果があります。"
+  },
+  {
+    "id": "GB21",
+    "name_ja": "肩井",
+    "name_en": "Jianjing",
+    "meridian": "Gallbladder",
+    "position": {
+      "x": 1.5,
+      "y": 1.8,
+      "z": 0
+    },
+    "description": "肩の上部、僧帽筋の中央に位置する胆経のツボ。肩こり、首の痛み、ストレス緩和に効果があります。"
+  },
+  {
+    "id": "PC6",
+    "name_ja": "内関",
+    "name_en": "Neiguan",
+    "meridian": "Pericardium",
+    "position": {
+      "x": 0.8,
+      "y": 0.2,
+      "z": 0.6
+    },
+    "description": "手首の内側、腱の間に位置する心包経のツボ。吐き気、動悸、不安感の緩和に効果があります。"
+  },
+  {
+    "id": "SP6",
+    "name_ja": "三陰交",
+    "name_en": "Sanyinjiao",
+    "meridian": "Spleen",
+    "position": {
+      "x": -0.3,
+      "y": -2.2,
+      "z": 0.2
+    },
+    "description": "足首の内側、脛骨の後ろに位置する脾経のツボ。婦人科疾患、消化不良、不眠症に効果があります。"
+  },
+  {
+    "id": "LV3",
+    "name_ja": "太衝",
+    "name_en": "Taichong",
+    "meridian": "Liver",
+    "position": {
+      "x": -0.2,
+      "y": -3.8,
+      "z": 0.1
+    },
+    "description": "足の甲、第1・2趾間に位置する肝経のツボ。ストレス、イライラ、眼精疲労の緩和に効果があります。"
+  }
+]

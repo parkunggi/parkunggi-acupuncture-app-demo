@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="3D acupuncture point search application - Explore traditional Chinese medicine acupoints with interactive 3D visualization">
+    <meta name="keywords" content="acupuncture, 経穴, TCM, 3D visualization, three.js">
+    <meta name="author" content="Parkunggi Acupuncture App">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://parkunggi.github.io/parkunggi-acupuncture-app-demo/">
+    <meta property="og:title" content="Acupuncture 3D SPA - Interactive Point Search">
+    <meta property="og:description" content="Explore traditional acupuncture points with interactive 3D visualization">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Acupuncture 3D SPA - Interactive Point Search">
+    <meta property="twitter:description" content="Explore traditional acupuncture points with interactive 3D visualization">
+    
+    <title>Acupuncture 3D SPA - Interactive Point Search</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="./styles.css">
+    
+    <!-- Three.js CDN - TODO: Replace with bundled version in production -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+      }
+    }
+    </script>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="./data/acupoints.json" as="fetch" crossorigin>
+    <link rel="modulepreload" href="https://unpkg.com/three@0.158.0/build/three.module.js">
+    <link rel="modulepreload" href="https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js">
+</head>
+<body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="sr-only">Skip to main content</a>
+    
+    <!-- Header -->
+    <header class="header" role="banner">
+        <div class="container">
+            <h1>経穴 3D SPA</h1>
+            <p>Interactive Acupuncture Point Search with 3D Visualization</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content" class="container" role="main">
+        <div class="main-content">
+            <!-- Search Panel -->
+            <aside class="search-panel" role="complementary" aria-label="Search and filters">
+                <div class="instructions">
+                    <h3>使い方 / How to use</h3>
+                    <p>経穴名、英語名、コード、または経絡名を入力して検索してください。検索結果をクリックすると3Dモデル上でその経穴がハイライトされます。</p>
+                </div>
+                
+                <div class="search-container">
+                    <label for="search-input" class="sr-only">Search acupuncture points</label>
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        class="search-input" 
+                        placeholder="経穴を検索... (例: 合谷, Hegu, LI4)"
+                        autocomplete="off"
+                        aria-describedby="search-instructions"
+                        aria-expanded="false"
+                        aria-haspopup="listbox"
+                        role="combobox"
+                    >
+                    <div id="search-instructions" class="sr-only">
+                        Type to search for acupuncture points. Use arrow keys to navigate results, Enter to select.
+                    </div>
+                    
+                    <div 
+                        id="search-results" 
+                        class="search-results" 
+                        role="listbox"
+                        aria-label="Search results"
+                    ></div>
+                </div>
+
+                <!-- Selected Point Information -->
+                <div id="selected-info" class="info-panel" role="region" aria-label="Selected acupoint information">
+                    <!-- Dynamic content will be inserted here -->
+                </div>
+                
+                <button id="clear-selection" class="btn btn-clear" aria-label="Clear current selection">
+                    ✕ Clear Selection
+                </button>
+            </aside>
+
+            <!-- 3D Scene Panel -->
+            <section class="scene-panel" role="region" aria-label="3D visualization">
+                <div id="scene-container" aria-label="3D model of human body with acupoint visualization">
+                    <!-- Three.js scene will be rendered here -->
+                </div>
+                
+                <!-- Loading indicator -->
+                <div id="loading" class="loading" aria-live="polite">
+                    <div class="loading-spinner" aria-hidden="true"></div>
+                    Loading 3D scene and acupoint data...
+                </div>
+            </section>
+        </div>
+
+        <!-- Development Notes (hidden in production) -->
+        <details class="container" style="margin-top: 2rem; font-size: 0.875rem; color: #666;">
+            <summary>Development Notes & Future Enhancements</summary>
+            <div style="padding: 1rem; background: #f8f9fa; border-radius: 0.5rem; margin-top: 0.5rem;">
+                <h4>Current MVP Features:</h4>
+                <ul>
+                    <li>✅ Simple 3D mannequin using Three.js primitives</li>
+                    <li>✅ Search functionality with multiple criteria</li>
+                    <li>✅ Point highlighting and information display</li>
+                    <li>✅ Responsive design with accessibility features</li>
+                    <li>✅ GitHub Pages deployment ready</li>
+                </ul>
+                
+                <h4>Planned Enhancements:</h4>
+                <ul>
+                    <li>🔄 Replace primitive shapes with detailed GLTF human model</li>
+                    <li>🔄 Add comprehensive acupoint database with medical accuracy</li>
+                    <li>🔄 Implement meridian filtering and visualization</li>
+                    <li>🔄 Add internationalization (i18n) support</li>
+                    <li>🔄 Integrate build system (Vite/webpack) for optimization</li>
+                    <li>🔄 Add offline support with Service Worker</li>
+                    <li>🔄 Include medical disclaimers and safety information</li>
+                </ul>
+                
+                <p><strong>Note:</strong> This is a prototype for educational purposes. Acupoint coordinates are approximate and should not be used for medical treatment without proper training.</p>
+            </div>
+        </details>
+    </main>
+
+    <!-- Footer -->
+    <footer style="text-align: center; padding: 2rem; color: #666; font-size: 0.875rem;">
+        <p>
+            <strong>Medical Disclaimer:</strong> This application is for educational purposes only. 
+            Acupoint positions are approximate and not medically verified. 
+            Always consult qualified practitioners for actual treatment.
+        </p>
+        <p>
+            Built with Three.js • <a href="https://github.com/parkunggi/parkunggi-acupuncture-app-demo" target="_blank" rel="noopener">View Source</a>
+        </p>
+    </footer>
+
+    <!-- Scripts -->
+    <script type="module">
+        // Try to import Three.js and controls with fallback
+        let useFullScene = true;
+        
+        try {
+            // Attempt to import Three.js
+            const THREE = await import('three');
+            const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+            
+            // Make Three.js available globally for scene.js
+            window.THREE = THREE.default || THREE;
+            window.THREE.OrbitControls = OrbitControls;
+            
+            console.log('Three.js loaded successfully');
+        } catch (error) {
+            console.warn('Three.js failed to load, using fallback 2D scene:', error);
+            useFullScene = false;
+        }
+        
+        // Load appropriate scene module
+        if (useFullScene) {
+            // Load full 3D scene
+            import('./js/scene.js').then(() => {
+                import('./js/app.js');
+            }).catch(() => {
+                // Fallback if 3D scene fails
+                import('./js/scene-fallback.js').then(() => {
+                    // Update app.js to use fallback
+                    window.Scene3D = window.Scene3DFallback;
+                    import('./js/app.js');
+                });
+            });
+        } else {
+            // Load fallback scene directly
+            import('./js/scene-fallback.js').then(() => {
+                // Update app.js to use fallback
+                window.Scene3D = window.Scene3DFallback;
+                import('./js/app.js');
+            });
+        }
+    </script>
+
+    <!-- Error fallback for browsers without module support -->
+    <script nomodule>
+        document.body.innerHTML = '<div style="text-align: center; padding: 2rem; color: #666;">This application requires a modern browser with ES6 module support. Please update your browser.</div>';
+    </script>
+
+    <!-- Analytics placeholder (add your analytics code here) -->
+    <!-- 
+    <script>
+        // Add your analytics tracking code here
+        // Google Analytics, Plausible, etc.
+    </script>
+    -->
+</body>
+</html>
