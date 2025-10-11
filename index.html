@@ -97,7 +97,7 @@
   }
 
   #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; display:inline-block; }
-  #result-name.is-important { color:var(--important-red); }
+  #result-name.is-important { color:#c40000; }
   #result-rank {
     display:inline-block; margin-left:10px; background:#334155; color:#fff;
     font-size:.60rem; padding:3px 8px 2px; border-radius:8px; letter-spacing:.4px; font-weight:600;
@@ -153,11 +153,7 @@
   .treat-main a:hover, .acu-pattern-link:hover, .treat-point-link:hover {
     color:var(--brand-blue-dark); border-color:var(--brand-blue-dark); background:rgba(11,77,156,.08); border-radius:3px;
   }
-  .treat-point-link.acu-important { color:var(--important-red); font-weight:700; border-bottom:1px solid var(--important-red); }
-  .treat-point-link.acu-important:hover {
-    color:#ff2a2a; border-color:#ff2a2a;
-    background:linear-gradient(90deg,rgba(196,0,0,.08),rgba(196,0,0,.03));
-  }
+  .treat-point-link.acu-important { color:var(--important-red); font-weight:700; border-bottom:1px solid var(--重要red); }
 
   .pattern-name-highlight { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
 
@@ -363,13 +359,16 @@
 
     <div id="inline-acupoint-result" class="result-layout hidden" aria-live="polite">
       <div class="info-container">
-        <h2 id="result-name">（経穴名） <span id="result-rank" style="display:none;"></span></h2>
-        <h3>経絡</h3><p id="result-meridian">（経絡未登録）</p>
-        <h3>部位</h3><p id="result-region">（部位未登録）</p>
+        <h2 id="result-name">
+          <span id="result-name-text">（経穴名）</span>
+          <span id="result-rank" style="display:none;"></span>
+        </h2>
+        <h3>経絡</h3><p id="result-meridian">-</p>
+        <h3>部位</h3><p id="result-region">-</p>
         <h3>要穴</h3><p id="result-important">-</p>
-        <h3>筋肉&lt;神経(筋枝)&gt;</h3><p id="result-muscle-branch">（未登録）</p>
-        <h3>神経(皮枝)</h3><p id="result-nerve-cutaneous">（未登録）</p>
-        <h3>血管</h3><p id="result-blood-vessel">（未登録）</p>
+        <h3>筋肉&lt;神経(筋枝)&gt;</h3><p id="result-muscle-branch">-</p>
+        <h3>神経(皮枝)</h3><p id="result-nerve-cutaneous">-</p>
+        <h3>血管</h3><p id="result-blood-vessel">-</p>
         <h3>病証名</h3>
         <ul id="related-symptoms"><li>-</li></ul>
       </div>
@@ -396,7 +395,6 @@
 </main>
 
 <script src="readings.js?v=20250930-hierarchy"></script>
-<!-- muscle-map.js 削除 -->
-<script src="app.js?v=20251011-RANK-COLUMNS-MIN3"></script>
+<script src="app.js?v=20251011-RANK-COLUMNS-MIN4"></script>
 </body>
 </html>
