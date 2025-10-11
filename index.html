@@ -70,8 +70,7 @@
     align-items:start;
   }
   .search-container{grid-area:search;} .selection-container{grid-area:symptoms;}
-  .clinical-result{grid-area:treatment;}
-  .meridian-image-section{grid-area:meridian;}
+  .clinical-result{grid-area:treatment;} .meridian-image-section{grid-area:meridian;}
 
   .search-container, .selection-container, .clinical-result, .result-layout {
     background:var(--box-bg); border:1px solid var(--box-border); border-radius:var(--radius); padding:12px 14px 14px;
@@ -98,8 +97,8 @@
 
   #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
   #result-name.is-important { color:var(--important-red); }
-  #result-name-text { }
-  #result-rank.rank-badge {
+  #result-name-text {}
+  #result-rank {
     display:inline-block; margin-left:10px; background:#334155; color:#fff;
     font-size:.60rem; padding:3px 8px 2px; border-radius:8px; letter-spacing:.4px; font-weight:600;
     vertical-align:middle;
@@ -153,6 +152,9 @@
   .treat-main a:hover, .acu-pattern-link:hover, .treat-point-link:hover {
     color:var(--brand-blue-dark); border-color:var(--brand-blue-dark); background:rgba(11,77,156,.08); border-radius:3px;
   }
+  .treat-point-link.acu-important {
+    color:var(--重要red);
+  }
 
   .hidden { display:none !important; }
 
@@ -188,7 +190,6 @@
     #inline-acupoint-result::-webkit-scrollbar-thumb:hover{ background:#0d6efd; }
   }
 
-  /* Home ギャラリー既存スタイル略 */
   #point-history-btn-wrapper, #pattern-history-btn-wrapper { position:relative; }
   #point-history-btn[data-count]:after,
   #pattern-history-btn[data-count]:after {
@@ -204,6 +205,19 @@
     font-weight:600;
     box-shadow:0 0 0 2px #0d6efd;
   }
+
+  @media (max-width:860px) {
+    #main-screen { grid-template-columns:1fr; }
+    .left-inner { grid-template-columns:1fr;
+      grid-template-areas:
+        "search"
+        "symptoms"
+        "treatment"
+        "meridian";
+    }
+    #inline-acupoint-result { position:static; max-height:none; overflow:visible; }
+    #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
+  }
 </style>
 </head>
 <body>
@@ -213,7 +227,7 @@
       <svg viewBox="0 0 24 24"><path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11l4.3 4.3a1 1 0 0 1-1.42 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.42 0z"/></svg>
     </button>
     <button id="home-btn" class="nav-btn" type="button" aria-label="ホーム" title="ホーム">
-      <svg viewBox="0 0 24 24"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
     </button>
     <button id="forward-btn" class="nav-btn" type="button" aria-label="進む" title="進む (Alt+→)">
       <svg viewBox="0 0 24 24"><path d="M9.3 18.7a1 1 0 0 1 0-1.4l4.3-4.3-4.3-4.3A1 1 0 0 1 10.7 7l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4 0z"/></svg>
@@ -239,14 +253,16 @@
     </div>
   </div>
 </header>
+
 <main>
   <section id="main-screen">
     <div class="left-inner">
       <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
         <input id="acupoint-search-input" type="text"
-               placeholder="経穴名(漢字/ひらがな)/筋肉<神経(筋枝)>" autocomplete="off"
-               aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false"
+               placeholder="経穴名(漢字/ひらがな)" /* 筋肉名検索は削除 */
+               autocomplete="off" aria-autocomplete="list"
+               aria-haspopup="listbox" aria-expanded="false"
                aria-owns="acupoint-suggestion-list">
         <div class="suggestion-wrapper">
           <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
@@ -302,7 +318,7 @@
       <div class="info-container">
         <h2 id="result-name">
           <span id="result-name-text">（経穴名）</span>
-          <span id="result-rank" class="rank-badge" style="display:none;"></span>
+          <span id="result-rank" style="display:none;"></span>
         </h2>
         <h3>経絡</h3><p id="result-meridian">-</p>
         <h3>部位</h3><p id="result-region">-</p>
@@ -335,8 +351,8 @@
   </div>
 </main>
 
-<script src="readings.js?v=20251011-rank-fullrestore1"></script>
+<script src="readings.js?v=20251011-rank-minimal"></script>
 <!-- muscle-map.js 削除 -->
-<script src="app.js?v=20251011-RANK-FULLRESTORE1"></script>
+<script src="app.js?v=20251011-RANK-MINIMAL-ONLY-REQ"></script>
 </body>
 </html>
