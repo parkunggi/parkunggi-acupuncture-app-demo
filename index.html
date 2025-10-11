@@ -131,12 +131,29 @@
   #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; font-weight:400; }
   #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #acupoint-suggestion-list li mark { background:#fff4c2; color:#222; padding:0 2px; border-radius:3px; }
-  #acupoint-suggestion-list li .sug-badges { display:flex; gap:4px; align-items:center; }
-  #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; line-height:1; border-radius:var(--badge-radius); font-weight:600; letter-spacing:.5px; }
-  .badge-important { background:#ffe0dc; color:#c40000; }
-  .badge-muscle { background:#e9f8ef; color:#1d7f34; }
-  #acupoint-suggestion-list li .sug-rank { font-size:.65rem; font-weight:600; color:#334155; min-width:2.2em; text-align:right; }
-  #acupoint-suggestion-list li.active, #acupoint-suggestion-list li:hover {
+  #acupoint-suggestion-list li .sug-rank {
+    font-size:.65rem; font-weight:600; color:#334155;
+    display:flex; gap:4px; align-items:center; justify-content:flex-end; min-width:3.5em;
+  }
+  .badge-mini {
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:2px 5px 1px;
+    font-size:.55rem; line-height:1;
+    border-radius:12px;
+    font-weight:700; letter-spacing:.5px;
+  }
+  .badge-star {
+    background:#ffe5e3; color:#c40000;
+    font-size:.65rem; padding:2px 6px 1px;
+  }
+  .badge-m { background:#e0f7ec; color:#0b6a32; }
+  .badge-n { background:#e0ecff; color:#0b3f9c; }
+  .badge-a { background:#ffeedd; color:#a64700; }
+  .badge-rank {
+    background:#334155; color:#fff; padding:2px 6px 1px; font-size:.55rem;
+  }
+  #acupoint-suggestion-list li.active,
+  #acupoint-suggestion-list li:hover {
     background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
   }
   #acupoint-suggestion-list li.active .sug-name,
@@ -147,6 +164,16 @@
   #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
   #acupoint-suggestion-list li.active .sug-rank,
   #acupoint-suggestion-list li:hover .sug-rank { color:#fff; }
+  #acupoint-suggestion-list li.active .badge-star,
+  #acupoint-suggestion-list li:hover .badge-star { background:#ffb9b4; color:#6b0000; }
+  #acupoint-suggestion-list li.active .badge-m,
+  #acupoint-suggestion-list li:hover .badge-m { background:#a8e8c8; color:#06401d; }
+  #acupoint-suggestion-list li.active .badge-n,
+  #acupoint-suggestion-list li:hover .badge-n { background:#a9c9ff; color:#062d67; }
+  #acupoint-suggestion-list li.active .badge-a,
+  #acupoint-suggestion-list li:hover .badge-a { background:#ffc89a; color:#5a2c00; }
+  #acupoint-suggestion-list li.active .badge-rank,
+  #acupoint-suggestion-list li:hover .badge-rank { background:#1e293b; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
@@ -427,6 +454,6 @@
 </main>
 
 <script src="readings.js?v=20250930-hierarchy"></script>
-<script src="app.js?v=20251011-RANK-COLS-ONLY-SUGGEST-RANK"></script>
+<script src="app.js?v=20251011-RANK-COLS-ONLY-SUGGEST-RANK-BADGES"></script>
 </body>
 </html>
