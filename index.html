@@ -96,9 +96,10 @@
     padding:2px 8px 2px; font-size:.68rem; border-radius:999px; font-weight:700; letter-spacing:.5px;
   }
 
-  #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; display:inline-block; }
-  #result-name.is-important { color:#c40000; }
-  #result-rank {
+  #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
+  #result-name.is-important { color:var(--important-red); }
+  #result-name-text { }
+  #result-rank.rank-badge {
     display:inline-block; margin-left:10px; background:#334155; color:#fff;
     font-size:.60rem; padding:3px 8px 2px; border-radius:8px; letter-spacing:.4px; font-weight:600;
     vertical-align:middle;
@@ -130,7 +131,6 @@
   #acupoint-suggestion-list li .sug-name.important { color:var(--important-red); }
   #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; font-weight:400; }
   #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #acupoint-suggestion-list li mark { background:#fff4c2; color:#222; padding:0 2px; border-radius:3px; }
   #acupoint-suggestion-list li.active,
   #acupoint-suggestion-list li:hover {
     background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
@@ -141,11 +141,11 @@
   #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
   #acupoint-suggestion-list li.active .sug-reading,
   #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
-  #acupoint-suggestion-list li.active mark,
-  #acupoint-suggestion-list li:hover mark { background:#084c9d; color:#fff; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
-
+  .treat-line { margin:0 0 8px; }
+  .treat-main { margin:0 0 2px; font-size:.72rem; line-height:1.4; }
+  .treat-comment { margin:0 0 4px; font-size:.63rem; color:#555; }
   .treat-main a, .acu-pattern-link, .treat-point-link {
     font-size:.74rem; text-decoration:none; color:var(--brand-blue); font-weight:600;
     border-bottom:1px solid rgba(11,77,156,.35); padding:0 1px; transition:color .15s, border-color .15s, background-color .15s;
@@ -153,13 +153,7 @@
   .treat-main a:hover, .acu-pattern-link:hover, .treat-point-link:hover {
     color:var(--brand-blue-dark); border-color:var(--brand-blue-dark); background:rgba(11,77,156,.08); border-radius:3px;
   }
-  .treat-point-link.acu-important { color:var(--important-red); font-weight:700; border-bottom:1px solid var(--重要red); }
 
-  .pattern-name-highlight { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
-
-  .treat-line { margin:0 0 8px; }
-  .treat-main { margin:0 0 2px; font-size:.72rem; line-height:1.4; }
-  .treat-comment { margin:0 0 4px; font-size:.63rem; color:#555; }
   .hidden { display:none !important; }
 
   .meridian-image-section {
@@ -194,6 +188,7 @@
     #inline-acupoint-result::-webkit-scrollbar-thumb:hover{ background:#0d6efd; }
   }
 
+  /* Home ギャラリー既存スタイル略 */
   #point-history-btn-wrapper, #pattern-history-btn-wrapper { position:relative; }
   #point-history-btn[data-count]:after,
   #pattern-history-btn[data-count]:after {
@@ -209,59 +204,6 @@
     font-weight:600;
     box-shadow:0 0 0 2px #0d6efd;
   }
-
-  @media (max-width:860px) {
-    #main-screen { grid-template-columns:1fr; }
-    .left-inner { grid-template-columns:1fr;
-      grid-template-areas:
-        "search"
-        "symptoms"
-        "treatment"
-        "meridian";
-    }
-    #inline-acupoint-result { position:static; max-height:none; overflow:visible; }
-    #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
-  }
-
-  #result-region .bui-red,
-  #result-region .bui-red * {
-    color:#d60000 !important;
-    font-weight:600;
-  }
-
-  .home-gallery-section {
-    margin:28px 0 0;
-    background:#fff;
-    border:1px solid #d4dae0;
-    border-radius:10px;
-    padding:14px 16px 18px;
-    box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
-  }
-  .home-gallery-inner { display:flex; flex-direction:column; gap:10px; }
-  .home-gallery-header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:.8rem; font-weight:600; color:#0b4d9c; }
-  #home-gallery-select {
-    padding:4px 8px; font-size:.8rem; border:1px solid #b9c3cc; border-radius:6px; background:#fff;
-  }
-  #home-gallery-select:focus { outline:2px solid #0d6efd55; border-color:#0d6efd; }
-  .home-gallery-image-wrapper {
-    position:relative; background:#f2f5f8; border:1px solid #d0d7dd; border-radius:8px;
-    padding:6px; text-align:center; min-height:160px;
-  }
-  .home-gallery-image-wrapper img { max-width:100%; height:auto; display:block; margin:0 auto; border-radius:4px; }
-  .home-gallery-fallback { font-size:.7rem; color:#c00; padding:18px 4px; }
-  @media (max-width:640px){
-    .home-gallery-header { font-size:.75rem; }
-    #home-gallery-select { font-size:.75rem; }
-  }
-
-  .hierarchy-select-group { display:grid; gap:8px; }
-  .hierarchy-select-group .field { display:flex; flex-direction:column; gap:3px; }
-  .hierarchy-select-group label { font-size:.68rem; font-weight:600; color:#333; }
-  .hierarchy-select-group select {
-    padding:5px 8px; font-size:.75rem; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
-  }
-  .hierarchy-select-group select:disabled { background:#f1f3f5; color:#777; }
-  .hierarchy-select-group option.disabled { color:#999; }
 </style>
 </head>
 <body>
@@ -271,7 +213,7 @@
       <svg viewBox="0 0 24 24"><path d="M14.7 5.3a1 1 0 0 1 0 1.4L10.41 11l4.3 4.3a1 1 0 0 1-1.42 1.4l-5-5a1 1 0 0 1 0-1.4l5-5a1 1 0 0 1 1.42 0z"/></svg>
     </button>
     <button id="home-btn" class="nav-btn" type="button" aria-label="ホーム" title="ホーム">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M12 3.1 2.5 11h2.1v9h6v-6h2.8v6h6v-9h2.1L12 3.1z"/></svg>
     </button>
     <button id="forward-btn" class="nav-btn" type="button" aria-label="進む" title="進む (Alt+→)">
       <svg viewBox="0 0 24 24"><path d="M9.3 18.7a1 1 0 0 1 0-1.4l4.3-4.3-4.3-4.3A1 1 0 0 1 10.7 7l5 5a1 1 0 0 1 0 1.4l-5 5a1 1 0 0 1-1.4 0z"/></svg>
@@ -303,9 +245,8 @@
       <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
         <input id="acupoint-search-input" type="text"
-               placeholder="経穴名(漢字/ひらがな)/筋肉<神経(筋枝)>"
-               autocomplete="off" aria-autocomplete="list"
-               aria-haspopup="listbox" aria-expanded="false"
+               placeholder="経穴名(漢字/ひらがな)/筋肉<神経(筋枝)>" autocomplete="off"
+               aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false"
                aria-owns="acupoint-suggestion-list">
         <div class="suggestion-wrapper">
           <ul id="acupoint-suggestion-list" class="hidden" role="listbox"></ul>
@@ -361,7 +302,7 @@
       <div class="info-container">
         <h2 id="result-name">
           <span id="result-name-text">（経穴名）</span>
-          <span id="result-rank" style="display:none;"></span>
+          <span id="result-rank" class="rank-badge" style="display:none;"></span>
         </h2>
         <h3>経絡</h3><p id="result-meridian">-</p>
         <h3>部位</h3><p id="result-region">-</p>
@@ -389,12 +330,13 @@
   </section>
 
   <div id="status-float">
-    <span id="data-load-status">CSV 読み込み中...</span>
-    <span id="clinical-load-status">臨床CSV 読み込み中...</span>
+    <span id="data-load-status">経穴CSV: 読込中...</span>
+    <span id="clinical-load-status">臨床CSV: 読込中...</span>
   </div>
 </main>
 
-<script src="readings.js?v=20250930-hierarchy"></script>
-<script src="app.js?v=20251011-RANK-COLUMNS-MIN4"></script>
+<script src="readings.js?v=20251011-rank-fullrestore1"></script>
+<!-- muscle-map.js 削除 -->
+<script src="app.js?v=20251011-RANK-FULLRESTORE1"></script>
 </body>
 </html>
