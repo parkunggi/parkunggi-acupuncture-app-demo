@@ -135,6 +135,7 @@
   #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; line-height:1; border-radius:var(--badge-radius); font-weight:600; letter-spacing:.5px; }
   .badge-important { background:#ffe0dc; color:#c40000; }
   .badge-muscle { background:#e9f8ef; color:#1d7f34; }
+  #acupoint-suggestion-list li .sug-rank { font-size:.65rem; font-weight:600; color:#334155; min-width:2.2em; text-align:right; }
   #acupoint-suggestion-list li.active, #acupoint-suggestion-list li:hover {
     background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
   }
@@ -144,12 +145,8 @@
   #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
   #acupoint-suggestion-list li.active .sug-reading,
   #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
-  #acupoint-suggestion-list li.active mark,
-  #acupoint-suggestion-list li:hover mark { background:#084c9d; color:#fff; }
-  #acupoint-suggestion-list li.active .badge-important,
-  #acupoint-suggestion-list li:hover .badge-important { background:#ffb6aa; color:#6b0000; }
-  #acupoint-suggestion-list li.active .badge-muscle,
-  #acupoint-suggestion-list li:hover .badge-muscle { background:#a9e6bd; color:#063d18; }
+  #acupoint-suggestion-list li.active .sug-rank,
+  #acupoint-suggestion-list li:hover .sug-rank { color:#fff; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
 
@@ -430,7 +427,6 @@
 </main>
 
 <script src="readings.js?v=20250930-hierarchy"></script>
-<!-- muscle-map.js 削除 -->
-<script src="app.js?v=20251011-RANK-COLS-ONLY"></script>
+<script src="app.js?v=20251011-RANK-COLS-ONLY-SUGGEST-RANK"></script>
 </body>
 </html>
