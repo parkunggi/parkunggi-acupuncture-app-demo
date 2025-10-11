@@ -70,7 +70,8 @@
     align-items:start;
   }
   .search-container{grid-area:search;} .selection-container{grid-area:symptoms;}
-  .clinical-result{grid-area:treatment;} .meridian-image-section{grid-area:meridian;}
+  .clinical-result{grid-area:treatment;}
+  .meridian-image-section{grid-area:meridian;}
 
   .search-container, .selection-container, .clinical-result, .result-layout {
     background:var(--box-bg); border:1px solid var(--box-border); border-radius:var(--radius); padding:12px 14px 14px;
@@ -97,12 +98,6 @@
 
   #result-name { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
   #result-name.is-important { color:var(--important-red); }
-  #result-name-text {}
-  #result-rank {
-    display:inline-block; margin-left:10px; background:#334155; color:#fff;
-    font-size:.60rem; padding:3px 8px 2px; border-radius:8px; letter-spacing:.4px; font-weight:600;
-    vertical-align:middle;
-  }
 
   #acupoint-search-input {
     width:100%; padding:7px 9px; font-size:.9rem; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
@@ -130,8 +125,12 @@
   #acupoint-suggestion-list li .sug-name.important { color:var(--important-red); }
   #acupoint-suggestion-list li .sug-slash { text-align:center; color:#999; font-weight:400; }
   #acupoint-suggestion-list li .sug-reading { color:#555; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #acupoint-suggestion-list li.active,
-  #acupoint-suggestion-list li:hover {
+  #acupoint-suggestion-list li mark { background:#fff4c2; color:#222; padding:0 2px; border-radius:3px; }
+  #acupoint-suggestion-list li .sug-badges { display:flex; gap:4px; align-items:center; }
+  #acupoint-suggestion-list li .badge { display:inline-block; padding:2px 6px 1px; font-size:.55rem; line-height:1; border-radius:var(--badge-radius); font-weight:600; letter-spacing:.5px; }
+  .badge-important { background:#ffe0dc; color:#c40000; }
+  .badge-muscle { background:#e9f8ef; color:#1d7f34; }
+  #acupoint-suggestion-list li.active, #acupoint-suggestion-list li:hover {
     background:var(--suggestion-active-bg); color:var(--suggestion-active-fg);
   }
   #acupoint-suggestion-list li.active .sug-name,
@@ -140,11 +139,15 @@
   #acupoint-suggestion-list li:hover .sug-name.important { color:#ffd5cf; }
   #acupoint-suggestion-list li.active .sug-reading,
   #acupoint-suggestion-list li:hover .sug-reading { color:#e6f1ff; }
+  #acupoint-suggestion-list li.active mark,
+  #acupoint-suggestion-list li:hover mark { background:#084c9d; color:#fff; }
+  #acupoint-suggestion-list li.active .badge-important,
+  #acupoint-suggestion-list li:hover .badge-important { background:#ffb6aa; color:#6b0000; }
+  #acupoint-suggestion-list li.active .badge-muscle,
+  #acupoint-suggestion-list li:hover .badge-muscle { background:#a9e6bd; color:#063d18; }
 
   .clinical-result { display:flex; flex-direction:column; gap:6px; }
-  .treat-line { margin:0 0 8px; }
-  .treat-main { margin:0 0 2px; font-size:.72rem; line-height:1.4; }
-  .treat-comment { margin:0 0 4px; font-size:.63rem; color:#555; }
+
   .treat-main a, .acu-pattern-link, .treat-point-link {
     font-size:.74rem; text-decoration:none; color:var(--brand-blue); font-weight:600;
     border-bottom:1px solid rgba(11,77,156,.35); padding:0 1px; transition:color .15s, border-color .15s, background-color .15s;
@@ -153,9 +156,18 @@
     color:var(--brand-blue-dark); border-color:var(--brand-blue-dark); background:rgba(11,77,156,.08); border-radius:3px;
   }
   .treat-point-link.acu-important {
-    color:var(--重要red);
+    color:var(--important-red); font-weight:700; border-bottom:1px solid var(--important-red);
+  }
+  .treat-point-link.acu-important:hover {
+    color:#ff2a2a; border-color:#ff2a2a;
+    background:linear-gradient(90deg,rgba(196,0,0,.08),rgba(196,0,0,.03));
   }
 
+  .pattern-name-highlight { color:var(--brand-blue); font-weight:700; letter-spacing:.5px; }
+
+  .treat-line { margin:0 0 8px; }
+  .treat-main { margin:0 0 2px; font-size:.72rem; line-height:1.4; }
+  .treat-comment { margin:0 0 4px; font-size:.63rem; color:#555; }
   .hidden { display:none !important; }
 
   .meridian-image-section {
@@ -185,11 +197,20 @@
       scrollbar-width:thin;
     }
     #inline-acupoint-result::-webkit-scrollbar{ width:8px; }
-    #inline-acupoint-result::-webkit-scrollbar-track{ background:#eef2f5; border-radius:4px; }
-    #inline-acupoint-result::-webkit-scrollbar-thumb{ background:#9bbce4; border-radius:4px; }
-    #inline-acupoint-result::-webkit-scrollbar-thumb:hover{ background:#0d6efd; }
+    #inline-acupoint-result::-webkit-scrollbar-track{
+      background:#eef2f5;
+      border-radius:4px;
+    }
+    #inline-acupoint-result::-webkit-scrollbar-thumb{
+      background:#9bbce4;
+      border-radius:4px;
+    }
+    #inline-acupoint-result::-webkit-scrollbar-thumb:hover{
+      background:#0d6efd;
+    }
   }
 
+  /* 履歴件数バッジ */
   #point-history-btn-wrapper, #pattern-history-btn-wrapper { position:relative; }
   #point-history-btn[data-count]:after,
   #pattern-history-btn[data-count]:after {
@@ -218,6 +239,67 @@
     #inline-acupoint-result { position:static; max-height:none; overflow:visible; }
     #acupoint-suggestion-list li { grid-template-columns:auto 8px 1fr auto; }
   }
+
+  /* [[ ]] 赤字強調 */
+  #result-region .bui-red,
+  #result-region .bui-red * {
+    color:#d60000 !important;
+    font-weight:600;
+  }
+
+  /* Home ギャラリー */
+  .home-gallery-section {
+    margin:28px 0 0;
+    background:#fff;
+    border:1px solid #d4dae0;
+    border-radius:10px;
+    padding:14px 16px 18px;
+    box-shadow:0 4px 14px -6px rgba(0,0,0,.12);
+  }
+  .home-gallery-inner { display:flex; flex-direction:column; gap:10px; }
+  .home-gallery-header {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    font-size:.8rem; font-weight:600; color:#0b4d9c;
+  }
+  #home-gallery-select {
+    padding:4px 8px; font-size:.8rem; border:1px solid #b9c3cc; border-radius:6px; background:#fff;
+  }
+  #home-gallery-select:focus { outline:2px solid #0d6efd55; border-color:#0d6efd; }
+  .home-gallery-image-wrapper {
+    position:relative;
+    background:#f2f5f8;
+    border:1px solid #d0d7dd;
+    border-radius:8px;
+    padding:6px;
+    text-align:center;
+    min-height:160px;
+  }
+  .home-gallery-image-wrapper img {
+    max-width:100%;
+    height:auto;
+    display:block;
+    margin:0 auto;
+    border-radius:4px;
+  }
+  .home-gallery-fallback {
+    font-size:.7rem;
+    color:#c00;
+    padding:18px 4px;
+  }
+  @media (max-width:640px){
+    .home-gallery-header { font-size:.75rem; }
+    #home-gallery-select { font-size:.75rem; }
+  }
+
+  /* 階層セレクト */
+  .hierarchy-select-group { display:grid; gap:8px; }
+  .hierarchy-select-group .field { display:flex; flex-direction:column; gap:3px; }
+  .hierarchy-select-group label { font-size:.68rem; font-weight:600; color:#333; }
+  .hierarchy-select-group select {
+    padding:5px 8px; font-size:.75rem; border:1px solid #c3ccd4; border-radius:6px; background:#fff;
+  }
+  .hierarchy-select-group select:disabled { background:#f1f3f5; color:#777; }
+  .hierarchy-select-group option.disabled { color:#999; }
 </style>
 </head>
 <body>
@@ -253,14 +335,13 @@
     </div>
   </div>
 </header>
-
 <main>
   <section id="main-screen">
     <div class="left-inner">
       <div id="search-card" class="search-container">
         <h2>経穴検索</h2>
         <input id="acupoint-search-input" type="text"
-               placeholder="経穴名(漢字/ひらがな)" /* 筋肉名検索は削除 */
+               placeholder="経穴名(漢字/ひらがな)/筋肉名"
                autocomplete="off" aria-autocomplete="list"
                aria-haspopup="listbox" aria-expanded="false"
                aria-owns="acupoint-suggestion-list">
@@ -316,22 +397,18 @@
 
     <div id="inline-acupoint-result" class="result-layout hidden" aria-live="polite">
       <div class="info-container">
-        <h2 id="result-name">
-          <span id="result-name-text">（経穴名）</span>
-          <span id="result-rank" style="display:none;"></span>
-        </h2>
-        <h3>経絡</h3><p id="result-meridian">-</p>
-        <h3>部位</h3><p id="result-region">-</p>
+        <h2 id="result-name">（経穴名）</h2>
+        <h3>経絡</h3><p id="result-meridian">（経絡未登録）</p>
+        <h3>部位</h3><p id="result-region">（部位未登録）</p>
         <h3>要穴</h3><p id="result-important">-</p>
-        <h3>筋肉&lt;神経(筋枝)&gt;</h3><p id="result-muscle-branch">-</p>
-        <h3>神経(皮枝)</h3><p id="result-nerve-cutaneous">-</p>
-        <h3>血管</h3><p id="result-blood-vessel">-</p>
+        <h3>筋肉</h3><p id="result-muscle">（筋肉未登録）</p>
         <h3>病証名</h3>
         <ul id="related-symptoms"><li>-</li></ul>
       </div>
     </div>
   </section>
 
+  <!-- Home 用 全身図ギャラリー -->
   <section id="home-gallery-section" class="home-gallery-section hidden" aria-label="経絡全身図選択">
     <div class="home-gallery-inner">
       <div class="home-gallery-header">
@@ -346,13 +423,13 @@
   </section>
 
   <div id="status-float">
-    <span id="data-load-status">経穴CSV: 読込中...</span>
-    <span id="clinical-load-status">臨床CSV: 読込中...</span>
+    <span id="data-load-status">CSV 読み込み中...</span>
+    <span id="clinical-load-status">臨床CSV 読み込み中...</span>
   </div>
 </main>
 
-<script src="readings.js?v=20251011-rank-minimal"></script>
-<!-- muscle-map.js 削除 -->
-<script src="app.js?v=20251011-RANK-MINIMAL-ONLY-REQ"></script>
+<script src="readings.js?v=20250930-hierarchy"></script>
+<script src="muscle-map.js?v=20250930-hierarchy"></script>
+<script src="app.js?v=20251001-HIERARCHY-FIX-SYNTAX5"></script>
 </body>
 </html>
